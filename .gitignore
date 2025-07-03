@@ -1,5 +1,6 @@
-# Kotlin/Java build
-/build/
+# Kotlin/Gradle
+.gradle/
+build/
 out/
 bin/
 
