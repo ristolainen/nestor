@@ -17,6 +17,13 @@
 | Input    | `JInput` for USB gamepad support |
 | Build    | Kotlin + Gradle                  |
 
+## Coding style
+
+1. Use a modern idiomatic Kotlin style
+2. Prefer when expressions over if-else
+3. Prefer function body expressions over block bodies, when possible
+4. For tests, use Kotest with the FreeSpec layout. Use forAll and row for parameterized tests. Use mockk for mocking
+
 ## Emulator Phases
 
 1. **Background Rendering** – Static frame from CHR + nametable
@@ -29,4 +36,5 @@
 
 - Project is in **Phase 1**
 - Focus is on CHR decoding and tile-based background rendering
+- Focus on using memory mapper 0 (NROM)
 - Core classes scaffolded: `RomLoader`, `Cpu`, `Ppu`, `ScreenRenderer`

@@ -3,9 +3,6 @@
 build/
 out/
 bin/
-
-# Gradle
-.gradle/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 
@@ -14,6 +11,7 @@ bin/
 *.iml
 *.ipr
 *.iws
+.idea_modules/
 
 # OS files
 .DS_Store
@@ -37,12 +35,6 @@ Thumbs.db
 *.env
 local.properties
 
-# JetBrains IDE caches
-.idea/
-*.iws
-*.iml
-.idea_modules/
-
 # VS Code (if used)
 .vscode/
 
@@ -50,3 +42,5 @@ local.properties
 *.dll
 *.so
 *.dylib
+
+roms/
