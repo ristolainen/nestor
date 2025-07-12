@@ -6,7 +6,7 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 
 ## 📦 Phase 1: Output the First Frame
 
-- [ ] Parse iNES ROM headers
+- [x] Parse iNES ROM headers
 - [x] Load PRG-ROM into memory
 - [x] Load CHR-ROM into memory (or allocate CHR-RAM if missing)
 - [ ] Implement memory mapping (RAM mirroring, PRG-ROM banks)

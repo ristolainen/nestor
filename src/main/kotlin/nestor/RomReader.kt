@@ -19,7 +19,12 @@ object RomReader {
         val chrSize = rom[5].toUByte().toInt() * 8 * 1024  // in bytes
 
         val flags6 = rom[6].toInt()
+        val flags7 = rom[7].toInt()
         val hasTrainer = (flags6 and 0b00000100) != 0
+
+        val mapperLow = (flags6 shr 4) and 0b00001111
+        val mapperHigh = (flags7 shr 4) and 0b00001111
+        val mapperNumber = (mapperHigh shl 4) or mapperLow
 
         var offset = 16
         if (hasTrainer) {
@@ -35,6 +40,7 @@ object RomReader {
 
         return INESRom(
             header = INESRom.Header(
+                mapperNumber = mapperNumber,
                 prgSize = prgSize,
                 chrSize = chrSize,
             ),
@@ -46,7 +52,8 @@ object RomReader {
 
 fun main() {
     // val rom = loadRomFile("test-roms/instr_test-v3/all_instrs.nes")
-    val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
+    // val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
+    val rom = loadRomFile("goodnes/Europe/Legend of Zelda, The (E) (V1.1) [!].nes")
     val inesRom = RomReader.read(rom)
     println(inesRom.header)
 }

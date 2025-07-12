@@ -8,6 +8,7 @@ data class INESRom(
     val chrData: ByteArray,
 ) {
     data class Header(
+        val mapperNumber: Int,
         val prgSize: Int,
         val chrSize: Int,
     )
