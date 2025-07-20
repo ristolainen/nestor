@@ -49,11 +49,3 @@ object RomReader {
         )
     }
 }
-
-fun main() {
-    // val rom = loadRomFile("test-roms/instr_test-v3/all_instrs.nes")
-    // val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
-    val rom = loadRomFile("goodnes/Europe/Legend of Zelda, The (E) (V1.1) [!].nes")
-    val inesRom = RomReader.read(rom)
-    println(inesRom.header)
-}
