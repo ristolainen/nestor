@@ -10,8 +10,8 @@ fun main() {
     val inesRom = RomReader.read(rom)
     println(inesRom.header)
 
-    val tiles = TileParser.parseTiles(inesRom.chrData)
-    println("Tiles size: " + tiles.size)
+    // val tiles = TileParser.parseTiles(inesRom.chrData)
+    // println("Tiles size: " + tiles.size)
     // println("Tiles: " + tiles.take(3))
 
     val ppu = PPU(inesRom)
@@ -27,8 +27,8 @@ fun main() {
         frame.isVisible = true
     }
 
-    val pixels = ppu.renderFrame()
-    screen.draw(pixels)
+    ppu.renderFrame()
+    screen.draw(ppu.currentFrame())
 
     // println("Nestor NES Emulator starting...")
     // Placeholder main loop

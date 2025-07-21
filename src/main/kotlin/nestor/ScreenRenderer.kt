@@ -9,13 +9,11 @@ import java.awt.image.BufferedImage
 import javax.swing.JPanel
 
 const val SCALE = 3
-const val SCREEN_WIDTH = 256
-const val SCREEN_HEIGHT = 240
 
 class ScreenRenderer : JPanel() {
     private val frameBuffer = BufferedImage(
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT,
+        FRAME_WIDTH,
+        FRAME_HEIGHT,
         BufferedImage.TYPE_INT_RGB,
     )
 
@@ -29,19 +27,19 @@ class ScreenRenderer : JPanel() {
     }
 
     override fun getPreferredSize() = Dimension(
-        SCREEN_WIDTH * SCALE,
-        SCREEN_HEIGHT * SCALE,
+        FRAME_WIDTH * SCALE,
+        FRAME_HEIGHT * SCALE,
     )
 
     fun draw(pixels: IntArray) {
         frameBuffer.setRGB(
             0,
             0,
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT,
+            FRAME_WIDTH,
+            FRAME_HEIGHT,
             pixels,
             0,
-            SCREEN_WIDTH
+            FRAME_WIDTH
         )
         repaint()
     }
