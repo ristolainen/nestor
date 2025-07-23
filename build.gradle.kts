@@ -18,6 +18,11 @@ dependencies {
 
     // Kotlin stdlib (explicit for clarity)
     implementation(kotlin("stdlib"))
+
+    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
+    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-framework-engine:5.9.1")
+    testImplementation("io.mockk:mockk:1.14.5")
 }
 
 application {
@@ -30,6 +35,10 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 // Optional: point to native libs if needed for JInput
