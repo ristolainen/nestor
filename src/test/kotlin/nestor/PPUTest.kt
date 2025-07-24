@@ -13,27 +13,26 @@ class PPUTest : FreeSpec({
         // 0 1 0 1 0 1 0 1
         // ...
         val tileData = makeCheckerboardTile()
-
-        printTileBitplane(tileData)
-
+            .also { printTileBitplane(it) }
         val rom = mockk<INESRom>()
         every { rom.chrData } returns tileData + ByteArray(0x2000 - 16) // pad to full CHR bank
 
-        val vram = ByteArray(VRAM_SIZE)
+        val nametableRam = ByteArray(NAMETABLE_RAM_SIZE)
+        val paletteRam = ByteArray(PALETTE_RAM_SIZE)
 
-        // --- Set nametable to use tile 0 at top-left (0,0) ---
-        vram[NAMETABLE_BASE] = 0x00
+        // Set tile 0 at top-left (0,0)
+        nametableRam[0x0000] = 0x00
 
-        // --- Set attribute table so tile (0,0) uses palette 1 ---
-        vram[ATTRTABLE_BASE] = 0b00000001 // top-left quadrant = palette 1
+        // Set attribute table byte for top-left quadrant (palette 1)
+        nametableRam[ATTRTABLE_OFFSET] = 0b00000001 // top-left quadrant = palette 1
 
-        // --- Set background palette 1 in $3F05–$3F07 ---
-        vram[PALETTE_BASE + 0] = 0x0F // universal bg color
-        vram[PALETTE_BASE + 5] = 0x01
-        vram[PALETTE_BASE + 6] = 0x21
-        vram[PALETTE_BASE + 7] = 0x31
+        // Palette 1: indexes at $3F05–$3F07
+        paletteRam[0x00] = 0x0F // universal bg color
+        paletteRam[0x05] = 0x01
+        paletteRam[0x06] = 0x21
+        paletteRam[0x07] = 0x31
 
-        val ppu = PPU(rom, vram)
+        val ppu = PPU(rom, nametableRam, paletteRam)
         ppu.renderFrame()
         val frame = ppu.currentFrame()
 
@@ -61,35 +60,29 @@ class PPUTest : FreeSpec({
 
     "should render the bottom right tile using palette 2" {
         val tileData = makeStripeTile()
-
-        printTileBitplane(tileData)
-
+            .also { printTileBitplane(it) }
         val rom = mockk<INESRom>()
         every { rom.chrData } returns tileData + ByteArray(0x2000 - 16)
 
-        val vram = ByteArray(VRAM_SIZE)
+        val nametableRam = ByteArray(NAMETABLE_RAM_SIZE)
+        val paletteRam = ByteArray(PALETTE_RAM_SIZE)
 
         val tileX = 31
         val tileY = 29
-        val tileIndex = NAMETABLE_BASE + tileY * TILES_PER_ROW + tileX
-        vram[tileIndex] = 0x00 // use tile 0 at bottom-right
+        val tileIndex = tileY * TILES_PER_ROW + tileX
+        nametableRam[tileIndex] = 0x00  // tile 0 at bottom-right
 
-        // Set attribute table byte that includes (31,29)
-        // Top-right quadrant → bits 2-3 → palette index 2
-        // TODO: Is this really correct? Suspect that this should be bottom-right.
+        // Set attribute for (31,29) tile → quadrant = bottom-right → shift = 6 → 0b11
         val attrIndex = (tileY / 4) * 8 + (tileX / 4)
-        vram[ATTRTABLE_BASE + attrIndex] = 0b00001000
+        nametableRam[ATTRTABLE_OFFSET + attrIndex] = 0b00001000  // palette 2 in bottom-right
 
-        // Set palette 2 entries in $3F09–$3F0B
-        vram[PALETTE_BASE + 0] = 0x0F // universal bg color (not used)
-        vram[PALETTE_BASE + 9] = 0x11 // palette[1]
-        vram[PALETTE_BASE + 10] = 0x21 // palette[2]
-        vram[PALETTE_BASE + 11] = 0x31 // palette[3]
+        // Palette 2: $3F09–$3F0B
+        paletteRam[0x00] = 0x0F
+        paletteRam[0x09] = 0x11
+        paletteRam[0x0A] = 0x21
+        paletteRam[0x0B] = 0x31
 
-        println("0x3F0A: " + vram[0x3F0A])
-        println("0x3F0B: " + vram[0x3F0B])
-
-        val ppu = PPU(rom, vram)
+        val ppu = PPU(rom, nametableRam, paletteRam)
         ppu.renderFrame()
         val frame = ppu.currentFrame()
 

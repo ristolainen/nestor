@@ -7,18 +7,23 @@ const val TILE_HEIGHT = 8
 const val TILES_PER_ROW = FRAME_WIDTH / TILE_WIDTH
 const val TILES_PER_COL = FRAME_HEIGHT / TILE_HEIGHT
 
-const val VRAM_SIZE = 0x4000
-const val NAMETABLE_BASE = 0x2000
-const val ATTRTABLE_BASE = 0x23C0
-const val PALETTE_BASE = 0x3F00
+const val NAMETABLE_SIZE = 0x0400
+const val NAMETABLE_RAM_SIZE = 2 * NAMETABLE_SIZE
+const val PALETTE_RAM_SIZE = 32
+const val ATTRTABLE_OFFSET = 0x03C0
 
 class PPU(
     rom: INESRom,
-    val vram: ByteArray = ByteArray(VRAM_SIZE)
+    val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE),
+    val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE),
 ) {
     private val tiles = TileParser.parseTiles(rom.chrData)
     private val framebuffer = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
 
+    /**
+     * Renders the visible 256x240 frame using nametable 0 (top-left).
+     * Does not include scrolling or mirroring logic yet.
+     */
     fun renderFrame() {
         for (tileY in 0 until TILES_PER_COL) {
             for (tileX in 0 until TILES_PER_ROW) {
@@ -44,21 +49,40 @@ class PPU(
     }
 
     private fun getTile(tileX: Int, tileY: Int): Array<IntArray> {
-        val nametableIndex = NAMETABLE_BASE + tileY * TILES_PER_ROW + tileX
-        val tileIndex = vram[nametableIndex].toInt() and 0xFF
+        require(tileX in 0 until TILES_PER_ROW && tileY in 0 until TILES_PER_COL) {
+            "getTile(): tile coordinates out of bounds — tileX=$tileX (max ${TILES_PER_ROW - 1}), tileY=$tileY (max ${TILES_PER_COL - 1})"
+        }
+        val nametableIndex = tileY * TILES_PER_ROW + tileX
+        val tileIndex = nametableRam[nametableIndex].toUByte().toInt()
         return tiles[tileIndex]
     }
 
     private fun getPaletteForTile(tileX: Int, tileY: Int): IntArray {
-        val attrX = tileX / 4
-        val attrY = tileY / 4
-        val attrIndex = attrY * 8 + attrX
-        val attrByte = vram[ATTRTABLE_BASE + attrIndex].toInt() and 0xFF
+        require(tileX in 0 until TILES_PER_ROW * 2 && tileY in 0 until TILES_PER_COL * 2) {
+            "Tile coordinates out of bounds: ($tileX, $tileY)"
+        }
+
+        // Determine which nametable this tile is in (0–3)
+        val nametableCol = tileX / TILES_PER_ROW  // 0 or 1
+        val nametableRow = tileY / TILES_PER_COL  // 0 or 1
+        val nametableIndex = nametableRow * 2 + nametableCol  // 0 to 3
+
+        val localTileX = tileX % TILES_PER_ROW
+        val localTileY = tileY % TILES_PER_COL
+        val nametableBase = nametableIndex * NAMETABLE_SIZE
+
+        // Compute attribute table index
+        val attrX = localTileX / 4
+        val attrY = localTileY / 4
+        val attrIndex = attrY * (TILES_PER_ROW / 4) + attrX  // 8 x 8 grid
+        val attrAddr = nametableBase + ATTRTABLE_OFFSET + attrIndex
+
+        val attrByte = nametableRam[attrAddr].toUByte().toInt()
 
         val shift = when {
-            tileX % 4 < 2 && tileY % 4 < 2 -> 0
-            tileX % 4 >= 2 && tileY % 4 < 2 -> 2
-            tileX % 4 < 2 && tileY % 4 >= 2 -> 4
+            localTileX % 4 < 2 && localTileY % 4 < 2 -> 0
+            localTileX % 4 >= 2 && localTileY % 4 < 2 -> 2
+            localTileX % 4 < 2 && localTileY % 4 >= 2 -> 4
             else -> 6
         }
 
@@ -69,12 +93,14 @@ class PPU(
     private fun getPalette(paletteIndex: Int): IntArray {
         require(paletteIndex in 0..3) { "Invalid background palette index: $paletteIndex" }
 
-        val base = PALETTE_BASE
-        val universalBgColorIndex = vram[base].toInt() and 0x3F
+        val universalBgColorIndex = paletteRam[0].toUByte().toInt()
 
-        val color1Index = vram[base + 1 + paletteIndex * 4].toInt() and 0x3F
-        val color2Index = vram[base + 2 + paletteIndex * 4].toInt() and 0x3F
-        val color3Index = vram[base + 3 + paletteIndex * 4].toInt() and 0x3F
+        // Use correct offset into paletteRam (non-contiguous)
+        val colorBase = 1 + paletteIndex * 4
+
+        val color1Index = paletteRam[colorBase].toUByte().toInt() and 0x3F
+        val color2Index = paletteRam[colorBase + 1].toUByte().toInt() and 0x3F
+        val color3Index = paletteRam[colorBase + 2].toUByte().toInt() and 0x3F
 
         return intArrayOf(
             nesPalette[universalBgColorIndex],

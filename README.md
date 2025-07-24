@@ -6,6 +6,14 @@ It aims to bring the joy and challenge of retro gaming to life with clean, moder
 
 ---
 
+## 🖼️ Example Output
+
+Here’s a static frame rendered by Nestor (Phase 1 complete):
+
+![First frame rendered by Nestor](screenshots/marioheads.png)
+
+---
+
 ## 🚀 Project Goals
 
 - ✅ Learn systems programming by emulating 8-bit hardware

@@ -10,10 +10,11 @@ fun main() {
     val inesRom = RomReader.read(rom)
     println(inesRom.header)
 
-    val vram = ByteArray(VRAM_SIZE)
-    initTestPalette(vram)
-    fakeNameTables(vram)
-    val ppu = PPU(inesRom, vram)
+    val nametableRam = ByteArray(NAMETABLE_RAM_SIZE)
+    val paletteRam = ByteArray(PALETTE_RAM_SIZE)
+    initTestPalette(paletteRam)
+    fakeNameTables(nametableRam)
+    val ppu = PPU(inesRom, nametableRam, paletteRam)
 
     val screen = ScreenRenderer()
     SwingUtilities.invokeLater {
@@ -33,7 +34,7 @@ fun main() {
     // Placeholder main loop
 }
 
-private fun initTestPalette(vram: ByteArray) {
+private fun initTestPalette(paletteRam: ByteArray) {
     // Each 4-byte block is a palette (background or sprite)
     val testPalette = byteArrayOf(
         0x0F, 0x21, 0x31, 0x30,  // Background palette 0: Sky + bricks
@@ -43,25 +44,26 @@ private fun initTestPalette(vram: ByteArray) {
     )
 
     for (i in testPalette.indices) {
-        vram[PALETTE_BASE + i] = testPalette[i]
+        paletteRam[i] = testPalette[i]
     }
 }
 
-private fun fakeNameTables(vram: ByteArray) {
+private fun fakeNameTables(nametableRam: ByteArray) {
+    // Fill tile indices for nametable 0
     val nametable = ByteArray(960) { i ->
-        if ((i / 32 + i % 32) % 2 == 0) 0x05 else 0x06
+        if ((i / TILES_PER_ROW + i % TILES_PER_ROW) % 2 == 0) 0x32 else 0x33
     }
-    nametable.copyInto(vram, destinationOffset = 0x2000)
+    nametable.copyInto(nametableRam)
 
-    // Cycle through palettes
-    for (i in 0x23C0 until 0x2400) {
-        val quadrant = (i - 0x23C0) % 4
+    // Fill attribute table for nametable 0, offset 0x03C0–0x03FF
+    for (i in 0x03C0 until 0x0400) {
+        val quadrant = (i - 0x03C0) % 4
         val value = when (quadrant) {
             0 -> 0b00000000  // All palette 0
             1 -> 0b01010101  // All palette 1
             2 -> 0b10101010  // All palette 2
             else -> 0b11111111  // All palette 3
         }.toByte()
-        vram[i] = value
+        nametableRam[i] = value
     }
 }
