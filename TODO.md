@@ -4,7 +4,7 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 
 ---
 
-## 📦 Phase 1: Output the First Frame
+## 📦 Phase 1: Output a static Frame
 
 - [x] Parse iNES ROM headers
 - [x] Load PRG-ROM into memory
@@ -12,7 +12,7 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 - [x] Implement memory mapping (RAM mirroring, PRG-ROM banks)
 - [x] Implement PPU nametable layout
 - [x] Decode CHR tiles into pixel arrays
-- [ ] Render background using nametable + tile data
+- [x] Render background using nametable + tile data
 - [x] Display frame using `BufferedImage` and Swing
 - [x] Build first `PPU` class and tile renderer
 

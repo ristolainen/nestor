@@ -50,9 +50,9 @@ The emulator is being built in the following stages:
 
 ## 🎮 Features (Eventually!)
 
-- [ ] iNES ROM loading
+- [x] iNES ROM loading
 - [ ] 6502 CPU emulation (partial)
-- [ ] PPU background rendering
+- [x] PPU background rendering
 - [ ] OAM sprite support
 - [ ] Controller input via USB gamepad
 - [ ] Audio playback via APU

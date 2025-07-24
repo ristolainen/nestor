@@ -34,7 +34,8 @@
 
 ## Current Status
 
-- Project is in **Phase 1**
-- Focus is on CHR decoding and tile-based background rendering
+- Project is in **Phase 2**
+- CPU instruction fetch/decode loop and PPU interaction in progress
+- Background rendering logic verified using mocked nametable data
 - Focus on using memory mapper 0 (NROM)
 - Core classes scaffolded: `RomLoader`, `Cpu`, `Ppu`, `ScreenRenderer`
