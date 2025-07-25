@@ -7,10 +7,10 @@ package nestor
  *  0 1 0 1 0 1 0 1
  *  ...
  */
-fun makeCheckerboardTile(): ByteArray {
+fun makeCheckerboardTileData(): ByteArray {
     val tile = ByteArray(16)
     val evenRow = 0b10101010
-    val oddRow  = 0b01010101
+    val oddRow = 0b01010101
 
     // plane 0 holds the low bits: alternate 1s and 0s
     for (i in 0 until 8) {
@@ -25,7 +25,18 @@ fun makeCheckerboardTile(): ByteArray {
     return tile
 }
 
-fun makeStripeTile(): ByteArray {
+/**
+ * Creates a checkerboard tile (8x8) as Array<IntArray>,
+ * alternating color indices 1 and 0.
+ */
+fun makeCheckerboardTile() = Array(8) { y ->
+    IntArray(8) { x ->
+        // Alternate every pixel in a checkerboard pattern: (x + y) % 2
+        if ((x + y) % 2 == 0) 1 else 0
+    }
+}
+
+fun makeStripeTileData(): ByteArray {
     val tile = ByteArray(16)
 
     val rowLowBits = 0b10101010 // plane 0: bit 0 for 2/3
@@ -38,6 +49,19 @@ fun makeStripeTile(): ByteArray {
 
     return tile
 }
+
+/**
+ * Creates a striped tile (8x8) as Array<IntArray>,
+ * alternating rows of color index 3 and 2.
+ */
+fun makeStripedTile() = Array(8) {
+    IntArray(8) { x -> if (x % 2 == 0) 3 else 2 }
+}
+
+/**
+ * Creates a blank tile (8x8) where all color indices are 0.
+ */
+fun makeBlankTile() = Array(8) { IntArray(8) { 0 } }
 
 fun printTileBitplane(tileData: ByteArray) {
     require(tileData.size == 16) { "Tile must be 16 bytes (8 bytes per bitplane)" }
@@ -59,6 +83,19 @@ fun printTileBitplane(tileData: ByteArray) {
             }
         }
         println(row)
+    }
+}
+
+/**
+ * Prints a tile as 8x8 grid of digits (0–3).
+ */
+fun printTile(tile: Array<IntArray>) {
+    require(tile.size == 8 && tile.all { it.size == 8 }) {
+        "Tile must be 8x8"
+    }
+
+    for (row in tile) {
+        println(row.joinToString("") { it.toString() })
     }
 }
 

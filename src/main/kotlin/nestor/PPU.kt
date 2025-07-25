@@ -12,13 +12,65 @@ const val NAMETABLE_RAM_SIZE = 2 * NAMETABLE_SIZE
 const val PALETTE_RAM_SIZE = 32
 const val ATTRTABLE_OFFSET = 0x03C0
 
+const val NAMETABLE_START = 0x2000
+const val PALETTE_START = 0x3F00
+
 class PPU(
-    rom: INESRom,
+    val tiles: List<Array<IntArray>>,
     val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE),
     val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE),
 ) {
-    private val tiles = TileParser.parseTiles(rom.chrData)
     private val framebuffer = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
+
+    fun readRegister(addr: Int): Int = when (addr) {
+        in 0x2000..0x3EFF -> {
+            val mirroredAddr = mirrorNametableAddr(addr)
+            nametableRam[mirroredAddr].toUByte().toInt()
+        }
+
+        in 0x3F00..0x3FFF -> {
+            val mirroredAddr = mirrorPaletteAddr(addr)
+            paletteRam[mirroredAddr].toUByte().toInt()
+        }
+
+        else -> throw IllegalArgumentException("Unsupported PPU read from $addr")
+    }
+
+    fun writeRegister(addr: Int, value: Int) {
+        val byteVal = value.toByte()
+        when (addr) {
+            in 0x2000..0x3EFF -> {
+                val mirroredAddr = mirrorNametableAddr(addr)
+                nametableRam[mirroredAddr] = byteVal
+            }
+
+            in 0x3F00..0x3FFF -> {
+                val mirroredAddr = mirrorPaletteAddr(addr)
+                paletteRam[mirroredAddr] = byteVal
+            }
+
+            else -> throw IllegalArgumentException("Unsupported PPU write to $addr")
+        }
+    }
+
+    private fun mirrorNametableAddr(addr: Int): Int =
+        // Mirror $2000–$2FFF into 2KB nametable RAM
+        (addr - NAMETABLE_START) % NAMETABLE_RAM_SIZE
+
+    private fun mirrorPaletteAddr(addr: Int): Int {
+        // Palette space is mirrored every 32 bytes from $3F00–$3FFF
+        val mirrored = (addr - PALETTE_START) % PALETTE_RAM_SIZE
+
+        // Handle mirrored background color entries:
+        // $3F10/$3F14/$3F18/$3F1C mirror $3F00/$3F04/$3F08/$3F0C
+        return when (mirrored) {
+            0x10 -> 0x00
+            0x14 -> 0x04
+            0x18 -> 0x08
+            0x1C -> 0x0C
+            else -> mirrored
+        }
+    }
 
     /**
      * Renders the visible 256x240 frame using nametable 0 (top-left).

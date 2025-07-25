@@ -14,7 +14,8 @@ fun main() {
     val paletteRam = ByteArray(PALETTE_RAM_SIZE)
     initTestPalette(paletteRam)
     fakeNameTables(nametableRam)
-    val ppu = PPU(inesRom, nametableRam, paletteRam)
+    val tiles = TileParser.parseTiles(inesRom.chrData)
+    val ppu = PPU(tiles, nametableRam, paletteRam)
 
     val screen = ScreenRenderer()
     SwingUtilities.invokeLater {
