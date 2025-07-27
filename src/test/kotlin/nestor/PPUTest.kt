@@ -108,52 +108,150 @@ class PPUTest : FreeSpec({
         }
     }
 
-    "nametable RAM writes and reads" - {
-        val ppu = PPU(listOf())
+    "cpuRead" - {
+        "cpuRead $2002 should return status and clear VBlank and writeToggle" {
+            val ppu = PPU(emptyList())
+            ppu.status = 0b11100000  // VBlank + sprite flags set
+            val result = ppu.cpuRead(0x2002)
 
-        "should write to $2000 and read back" {
-            ppu.writeRegister(0x2000, 0x11)
-            ppu.readRegister(0x2000) shouldBe 0x11
-            ppu.nametableRam[0x0000] shouldBe 0x11.toByte()
+            result shouldBe 0b11100000
+            ppu.status and 0x80 shouldBe 0  // VBlank bit cleared
+            ppu.writeToggle shouldBe false
         }
 
-        "should write to $27FF and mirror correctly at $37FF" {
-            ppu.writeRegister(0x27FF, 0x22)
-            ppu.readRegister(0x37FF) shouldBe 0x22
-            ppu.nametableRam[0x07FF] shouldBe 0x22.toByte()
+        "cpuRead $2004 should return value at OAMADDR" {
+            val ppu = PPU(emptyList())
+            ppu.oamRam[5] = 0x42
+            ppu.oamAddr = 5
+
+            val result = ppu.cpuRead(0x2004)
+            result shouldBe 0x42
         }
 
-        "should write to $2ABC and mirror to $3ABC" {
-            ppu.writeRegister(0x2ABC, 0x33)
-            ppu.readRegister(0x3ABC) shouldBe 0x33
+        "cpuRead $2007 should return buffered value on nametable access" {
+            val ppu = PPU(emptyList())
+            ppu.nametableRam[0x0000] = 0x12
+            ppu.nametableRam[0x0001] = 0x34
+            ppu.vramAddr = 0x2000
+
+            // First read returns old buffer, updates buffer
+            ppu.ppuDataBuffer = 0xAB.toByte()
+            val first = ppu.cpuRead(0x2007)
+            val second = ppu.cpuRead(0x2007)
+
+            first shouldBe 0xAB            // old buffer
+            second shouldBe 0x12           // was just buffered
+            ppu.ppuDataBuffer.toUByte().toInt() shouldBe 0x34
+        }
+
+        "cpuRead $2007 should return actual palette value immediately" {
+            val ppu = PPU(emptyList())
+            ppu.vramAddr = 0x3F00
+            ppu.paletteRam[0x00] = 0x3C
+
+            val result = ppu.cpuRead(0x2007)
+            result shouldBe 0x3C
+        }
+
+        "cpuRead $2007 should increment and wrap vramAddr" {
+            val ppu = PPU(emptyList())
+            ppu.vramAddr = 0x3FFF
+            ppu.paletteRam[0x1F] = 0x21
+
+            ppu.cpuRead(0x2007)
+            ppu.vramAddr shouldBe 0x0000
         }
     }
 
-    "palette RAM writes and reads" - {
-        val ppu = PPU(listOf())
+    "cpuWrite" - {
+        "cpuWrite $2000 should set control and update bits 10–11 of tempAddr" {
+            val ppu = PPU(emptyList())
+            ppu.cpuWrite(0x2000, 0b00000011)
 
-        "should write to $3F00 and read back" {
-            ppu.writeRegister(0x3F00, 0x40)
-            ppu.readRegister(0x3F00) shouldBe 0x40
-            ppu.paletteRam[0x00] shouldBe 0x40.toByte()
+            ppu.control shouldBe 0b00000011
+            (ppu.tempAddr shr 10) and 0b11 shouldBe 0b11
         }
 
-        "should write to $3F1F and mirror to $3FFF" {
-            ppu.writeRegister(0x3F1F, 0x50)
-            ppu.readRegister(0x3FFF) shouldBe 0x50
-            ppu.paletteRam[0x1F] shouldBe 0x50.toByte()
+        "cpuWrite $2001 should set mask register" {
+            val ppu = PPU(emptyList())
+            ppu.cpuWrite(0x2001, 0x3F)
+
+            ppu.mask shouldBe 0x3F
         }
 
-        "should mirror $3F10 to $3F00" {
-            ppu.writeRegister(0x3F10, 0x66)
-            ppu.readRegister(0x3F00) shouldBe 0x66
-            ppu.paletteRam[0x00] shouldBe 0x66.toByte()
+        "cpuWrite $2003 should set oamAddr" {
+            val ppu = PPU(emptyList())
+            ppu.cpuWrite(0x2003, 0x42)
+
+            ppu.oamAddr shouldBe 0x42
         }
 
-        "should mirror $3F14 to $3F04" {
-            ppu.writeRegister(0x3F14, 0x77)
-            ppu.readRegister(0x3F04) shouldBe 0x77
-            ppu.paletteRam[0x04] shouldBe 0x77.toByte()
+        "cpuWrite $2004 should write to OAM at oamAddr and increment it" {
+            val ppu = PPU(emptyList())
+            ppu.oamAddr = 0x10
+            ppu.cpuWrite(0x2004, 0xAB)
+
+            ppu.oamRam[0x10].toUByte().toInt() shouldBe 0xAB
+            ppu.oamAddr shouldBe 0x11
+        }
+
+        "cpuWrite $2005 should write fineX and coarseX on first write" {
+            val ppu = PPU(emptyList())
+            ppu.writeToggle = false
+            ppu.cpuWrite(0x2005, 0b10100101)
+
+            ppu.fineXScroll shouldBe 0b00000101
+            ppu.tempAddr and 0x001F shouldBe 0b10100
+            ppu.writeToggle shouldBe true
+            ppu.scrollX shouldBe 0b10100101
+        }
+
+        "cpuWrite $2005 should write coarseY and fineY on second write" {
+            val ppu = PPU(emptyList())
+            ppu.writeToggle = true
+            ppu.cpuWrite(0x2005, 0b01110110)
+
+            (ppu.tempAddr shr 12) and 0b111 shouldBe 0b110  // fine Y
+            (ppu.tempAddr shr 5) and 0b11111 shouldBe 0b01110  // coarse Y
+            ppu.writeToggle shouldBe false
+            ppu.scrollY shouldBe 0b01110110
+        }
+
+        "cpuWrite $2006 should write high byte of tempAddr on first write" {
+            val ppu = PPU(emptyList())
+            ppu.writeToggle = false
+            ppu.cpuWrite(0x2006, 0x3F)
+
+            (ppu.tempAddr shr 8) and 0x3F shouldBe 0x3F
+            ppu.writeToggle shouldBe true
+        }
+
+        "cpuWrite $2006 should write low byte and set vramAddr on second write" {
+            val ppu = PPU(emptyList())
+            ppu.writeToggle = true
+            ppu.tempAddr = 0x3F00
+            ppu.cpuWrite(0x2006, 0x10)
+
+            ppu.tempAddr shouldBe 0x3F10
+            ppu.vramAddr shouldBe 0x3F10
+            ppu.writeToggle shouldBe false
+        }
+
+        "cpuWrite $2007 should write to nametableRam and increment vramAddr" {
+            val ppu = PPU(emptyList())
+            ppu.vramAddr = 0x2000
+            ppu.cpuWrite(0x2007, 0x99)
+
+            ppu.nametableRam[0x0000] shouldBe 0x99.toByte()
+            ppu.vramAddr shouldBe 0x2001
+        }
+
+        "cpuWrite $2007 should write to paletteRam with mirrored address" {
+            val ppu = PPU(emptyList())
+            ppu.vramAddr = 0x3F10
+            ppu.cpuWrite(0x2007, 0x0F)
+
+            ppu.paletteRam[0x00] shouldBe 0x0F.toByte()
         }
     }
 })
