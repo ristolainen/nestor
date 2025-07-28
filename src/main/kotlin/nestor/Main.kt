@@ -40,10 +40,11 @@ private fun fakePalette(memoryBus: MemoryBus) {
 
     // Example: fill with a repeating pattern of color indices
     val values = byteArrayOf(
-        0x0F, 0x21, 0x31, 0x30,  // Background palette 0: Sky + bricks
-        0x0F, 0x1A, 0x2A, 0x27,  // Background palette 1: Bushes + clouds
-        0x0F, 0x16, 0x27, 0x18,  // Background palette 2: Ground + shadows
-        0x0F, 0x00, 0x10, 0x20,  // Background palette 3: Misc/unused
+        0x0F,               // Universal background color
+        0x21, 0x31, 0x30,   // Background palette 0: Sky + bricks
+        0x1A, 0x2A, 0x27,   // Background palette 1: Bushes + clouds
+        0x16, 0x27, 0x18,   // Background palette 2: Ground + shadows
+        0x00, 0x10, 0x20,   // Background palette 3: Misc/unused
     )
 
     for (value in values) {

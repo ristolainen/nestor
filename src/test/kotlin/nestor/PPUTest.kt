@@ -26,8 +26,8 @@ class PPUTest : FreeSpec({
             // Palette 1 setup — universal background color at $3F00, palette 1 at $3F04–$3F06
             writePpuAddr(memoryBus, 0x3F00)
             memoryBus.write(0x2007, 0x0F) // universal BG
-            // Palette 1 → $3F04–$3F06 (because index 1 * 3 + 1 = offset 4)
-            writePpuAddr(memoryBus, 0x3F05)
+            // Palette 1 → $3F04–$3F06
+            writePpuAddr(memoryBus, 0x3F04)
             memoryBus.write(0x2007, 0x01) // color 1
             memoryBus.write(0x2007, 0x21) // color 2
             memoryBus.write(0x2007, 0x31) // color 3
@@ -77,10 +77,10 @@ class PPUTest : FreeSpec({
             bus.write(0x2006, attrAddr and 0xFF)
             bus.write(0x2007, 0b00001000) // palette 2 in bottom-right quadrant (bits 6–7)
 
-            // Write palette RAM for palette 2: $3F07 + (2 * 3) = $3F09–$3F0B
+            // Write palette RAM for palette 2: $3F00 + 1 + (2 * 3) = $3F07–$3F09
             writePpuAddr(bus, 0x3F00)
             bus.write(0x2007, 0x0F) // universal bg color
-            writePpuAddr(bus, 0x3F09)
+            writePpuAddr(bus, 0x3F07)
             bus.write(0x2007, 0x11) // $3F07 – Palette 2 color 1
             bus.write(0x2007, 0x21) // $3F08 – Palette 2 color 2
             bus.write(0x2007, 0x31) // $3F09 – Palette 2 color 3

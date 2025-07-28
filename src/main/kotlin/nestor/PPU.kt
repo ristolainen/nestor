@@ -248,8 +248,8 @@ class PPU(
 
         val universalBgColorIndex = paletteRam[0].toUByte().toInt()
 
-        // Use correct offset into paletteRam (non-contiguous)
-        val colorBase = 1 + paletteIndex * 4
+        // Use correct offset into paletteRam
+        val colorBase = 1 + paletteIndex * 3
 
         val color1Index = paletteRam[colorBase].toUByte().toInt() and 0x3F
         val color2Index = paletteRam[colorBase + 1].toUByte().toInt() and 0x3F
