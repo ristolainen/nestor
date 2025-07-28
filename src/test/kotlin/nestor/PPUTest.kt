@@ -5,30 +5,33 @@ import io.kotest.matchers.shouldBe
 
 class PPUTest : FreeSpec({
     "renderFrame" - {
+        fun writePpuAddr(memoryBus: MemoryBus, addr: Int) {
+            memoryBus.write(0x2006, (addr shr 8) and 0xFF)
+            memoryBus.write(0x2006, addr and 0xFF)
+        }
+
         "should render the top left tile using palette 1" {
-            // Create a checkerboard pattern tile
-            // Color layout:
-            // 1 0 1 0 1 0 1 0
-            // 0 1 0 1 0 1 0 1
-            // ...
-            val tile = makeCheckerboardTile()
-                .also { printTile(it) }
-            val nametableRam = ByteArray(NAMETABLE_RAM_SIZE)
-            val paletteRam = ByteArray(PALETTE_RAM_SIZE)
+            val tile = makeCheckerboardTile().also { printTile(it) }
+            val ppu = PPU(listOf(tile)) // Start with empty RAM
+            val memoryBus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // Empty ROM for test
 
             // Set tile 0 at top-left (0,0)
-            nametableRam[0x0000] = 0x00
+            writePpuAddr(memoryBus, 0x2000)
+            memoryBus.write(0x2007, 0x00)
 
-            // Set attribute table byte for top-left quadrant (palette 1)
-            nametableRam[ATTRTABLE_OFFSET] = 0b00000001 // top-left quadrant = palette 1
+            // Set attribute byte for top-left quadrant of nametable (palette 1)
+            writePpuAddr(memoryBus, 0x23C0)
+            memoryBus.write(0x2007, 0b00000001)
 
-            // Palette 1: indexes at $3F05–$3F07
-            paletteRam[0x00] = 0x0F // universal bg color
-            paletteRam[0x05] = 0x01
-            paletteRam[0x06] = 0x21
-            paletteRam[0x07] = 0x31
+            // Palette 1 setup — universal background color at $3F00, palette 1 at $3F04–$3F06
+            writePpuAddr(memoryBus, 0x3F00)
+            memoryBus.write(0x2007, 0x0F) // universal BG
+            // Palette 1 → $3F04–$3F06 (because index 1 * 3 + 1 = offset 4)
+            writePpuAddr(memoryBus, 0x3F05)
+            memoryBus.write(0x2007, 0x01) // color 1
+            memoryBus.write(0x2007, 0x21) // color 2
+            memoryBus.write(0x2007, 0x31) // color 3
 
-            val ppu = PPU(listOf(tile), nametableRam, paletteRam)
             ppu.renderFrame()
             val frame = ppu.currentFrame()
 
@@ -55,27 +58,33 @@ class PPUTest : FreeSpec({
         }
 
         "should render the bottom right tile using palette 2" {
-            val tile = makeStripedTile()
-                .also { printTile(it) }
-            val nametableRam = ByteArray(NAMETABLE_RAM_SIZE)
-            val paletteRam = ByteArray(PALETTE_RAM_SIZE)
+            val tile = makeStripedTile().also { printTile(it) }
+            val ppu = PPU(listOf(tile))
+            val bus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // dummy ROM
 
             val tileX = 31
             val tileY = 29
             val tileIndex = tileY * TILES_PER_ROW + tileX
-            nametableRam[tileIndex] = 0x00  // tile 0 at bottom-right
 
-            // Set attribute for (31,29) tile → quadrant = bottom-right → shift = 6 → 0b11
-            val attrIndex = (tileY / 4) * 8 + (tileX / 4)
-            nametableRam[ATTRTABLE_OFFSET + attrIndex] = 0b00001000  // palette 2 in bottom-right
+            // Write tile 0 at bottom-right position in nametable
+            writePpuAddr(bus, 0x2000 + tileIndex)
+            bus.write(0x2007, 0x00)
 
-            // Palette 2: $3F09–$3F0B
-            paletteRam[0x00] = 0x0F
-            paletteRam[0x09] = 0x11
-            paletteRam[0x0A] = 0x21
-            paletteRam[0x0B] = 0x31
+            // Write attribute byte for the (31, 29) tile's 32x32 region
+            val attrIndex = (tileY / 4) * 8 + (tileX / 4) // 8x8 attribute grid
+            val attrAddr = 0x23C0 + attrIndex
+            bus.write(0x2006, (attrAddr shr 8) and 0xFF)
+            bus.write(0x2006, attrAddr and 0xFF)
+            bus.write(0x2007, 0b00001000) // palette 2 in bottom-right quadrant (bits 6–7)
 
-            val ppu = PPU(listOf(tile), nametableRam, paletteRam)
+            // Write palette RAM for palette 2: $3F07 + (2 * 3) = $3F09–$3F0B
+            writePpuAddr(bus, 0x3F00)
+            bus.write(0x2007, 0x0F) // universal bg color
+            writePpuAddr(bus, 0x3F09)
+            bus.write(0x2007, 0x11) // $3F07 – Palette 2 color 1
+            bus.write(0x2007, 0x21) // $3F08 – Palette 2 color 2
+            bus.write(0x2007, 0x31) // $3F09 – Palette 2 color 3
+
             ppu.renderFrame()
             val frame = ppu.currentFrame()
 
@@ -95,11 +104,9 @@ class PPUTest : FreeSpec({
             }.flatten()
 
             val expectedTile = expectedIndices.map { colorIndex ->
-                // colorIndex 2 → palette[2] = vram[0x3F0A] = 0x21
-                // colorIndex 3 → palette[3] = vram[0x3F0B] = 0x31
                 when (colorIndex) {
-                    2 -> nesPalette[0x21]
-                    3 -> nesPalette[0x31]
+                    2 -> nesPalette[0x21] // Palette color 2
+                    3 -> nesPalette[0x31] // Palette color 3
                     else -> error("This test should only include color indices 2 and 3")
                 }
             }

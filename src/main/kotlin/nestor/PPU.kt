@@ -18,10 +18,13 @@ const val PALETTE_START = 0x3F00
 
 class PPU(
     val tiles: List<Array<IntArray>>,
-    val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE),
-    val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE),
-    val oamRam: ByteArray = ByteArray(OAM_RAM_SIZE)
 ) {
+    internal val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE)
+    internal val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE)
+    internal val oamRam: ByteArray = ByteArray(OAM_RAM_SIZE)
+
+    private val framebuffer = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
+
     internal var control: Int = 0
     internal var mask: Int = 0
     internal var scrollX: Int = 0
@@ -33,8 +36,6 @@ class PPU(
     internal var ppuDataBuffer: Byte = 0
     internal var vramAddr: Int = 0
     internal var writeToggle = false
-
-    private val framebuffer = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
 
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
         0x2002 -> readStatus()
