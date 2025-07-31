@@ -37,6 +37,10 @@ class PPU(
     internal var vramAddr: Int = 0
     internal var writeToggle = false
 
+    fun tick(cycles: Int) {
+        // TODO: Implement tick behaviour
+    }
+
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
         0x2002 -> readStatus()
         0x2004 -> readOamData()

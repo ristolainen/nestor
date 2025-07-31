@@ -30,8 +30,12 @@ fun main() {
     ppu.renderFrame()
     screen.draw(ppu.currentFrame())
 
-    // println("Nestor NES Emulator starting...")
-    // Placeholder main loop
+    val cpu = CPU(memoryBus)
+    val emulation = Emulation(cpu, ppu)
+    emulation.runFrame()
+
+    ppu.renderFrame()
+    screen.draw(ppu.currentFrame())
 }
 
 private fun fakePalette(memoryBus: MemoryBus) {
