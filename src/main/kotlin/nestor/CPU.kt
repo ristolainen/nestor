@@ -1,14 +1,19 @@
 package nestor
 
+const val FLAG_INTERRUPT_DISABLE = 0b00000100
+
 class CPU(
     val memory: MemoryBus,
 ) {
     var pc: Int = 0
+    var status: Int = 0
 
     fun reset() {
         val lo = memory.read(0xFFFC)
         val hi = memory.read(0xFFFD)
         pc = (hi shl 8) or lo
+
+        status = 0x24
     }
 
     fun step(): Int {
@@ -19,14 +24,20 @@ class CPU(
     }
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
+        0x78 -> sei()
         0xEA -> noop()
         else -> unknown(opcode)
     }
 
-    private fun unknown(opcode: Int): Int {
-        println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
-        return 0
+    // Set interrupt
+    private fun sei() = 2.also {
+        status = status or FLAG_INTERRUPT_DISABLE
     }
 
-    private fun noop(): Int = 2
+    // No-op
+    private fun noop() = 2
+
+    private fun unknown(opcode: Int) = 1.also {
+        println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
+    }
 }

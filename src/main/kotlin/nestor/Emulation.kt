@@ -26,4 +26,15 @@ class Emulation(
             cycles += cpuCycles
         }
     }
+
+    fun runAFewTicks() {
+        println("Running a few ticks")
+        cpu.reset()
+        var cycles = 0
+        while (cycles < 100) {
+            val cpuCycles = cpu.step()
+            ppu.tick(cpuCycles * 3)
+            cycles += cpuCycles
+        }
+    }
 }
