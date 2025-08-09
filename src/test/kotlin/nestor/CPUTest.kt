@@ -110,4 +110,19 @@ class CPUTest : FreeSpec({
             cycles shouldBe 4
         }
     }
+
+    "TXS instruction" - {
+        "should transfer X to stack pointer without affecting flags" {
+            val cpu = setupCpuWithInstruction(0x9A) // TXS opcode
+            cpu.x = 0x42
+            cpu.sp = 0x00
+            val originalStatus = cpu.status
+
+            val cycles = cpu.step()
+
+            cpu.sp shouldBe 0x42
+            cpu.status shouldBe originalStatus // flags unchanged
+            cycles shouldBe 2
+        }
+    }
 })

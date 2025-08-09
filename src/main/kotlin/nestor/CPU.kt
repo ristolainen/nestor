@@ -14,6 +14,7 @@ class CPU(
     var a: Int = 0
     var x: Int = 0
     var y: Int = 0
+    var sp: Int = 0
 
     fun reset() {
         val lo = memory.read(0xFFFC)
@@ -31,6 +32,7 @@ class CPU(
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
         0x78 -> sei()
         0x8D -> sdaAbsolute()
+        0x9A -> txs()
         0xA0 -> ldyImmediate()
         0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
@@ -48,6 +50,11 @@ class CPU(
     private fun sdaAbsolute() = 4.also {
         val address = readNextWord()
         memory.write(address, a)
+    }
+
+    // Transfer X to stack pointer
+    private fun txs() = 2.also {
+        sp = x and 0xFF
     }
 
     // Load X immediate
