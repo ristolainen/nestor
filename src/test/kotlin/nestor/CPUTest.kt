@@ -1,6 +1,8 @@
 package nestor
 
 import io.kotest.core.spec.style.FreeSpec
+import io.kotest.data.blocking.forAll
+import io.kotest.data.row
 import io.kotest.matchers.shouldBe
 
 class CPUTest : FreeSpec({
@@ -52,50 +54,60 @@ class CPUTest : FreeSpec({
         }
     }
 
-    "LDA immediate instruction" - {
-        "should load a non-zero value into the accumulator" {
-            val cpu = setupCpuWithInstruction(0xA9, 0x42)
+    "Immediate loads (LDA/LDX/LDY)" - {
+        "should load and set Z/N correctly" {
+            forAll(
+                // label, opcode, imm, targetReg, expectedZ, expectedN, initialStatus
+                row("LDA non-zero", 0xA9, 0x42, 'A', 0, 0, 0),
+                row("LDA zero", 0xA9, 0x00, 'A', FLAG_ZERO, 0, 0),
+                row("LDA neg", 0xA9, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
+                row("LDA clear", 0xA9, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-            val cycles = cpu.step()
+                row("LDX non-zero", 0xA2, 0x42, 'X', 0, 0, 0),
+                row("LDX zero", 0xA2, 0x00, 'X', FLAG_ZERO, 0, 0),
+                row("LDX neg", 0xA2, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
+                row("LDX clear", 0xA2, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-            cpu.accumulator shouldBe 0x42
-            cpu.status and FLAG_ZERO shouldBe 0
-            cpu.status and FLAG_NEGATIVE shouldBe 0
-            cycles shouldBe 2
+                row("LDY non-zero", 0xA0, 0x33, 'Y', 0, 0, 0),
+                row("LDY zero", 0xA0, 0x00, 'Y', FLAG_ZERO, 0, 0),
+                row("LDY neg", 0xA0, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
+                row("LDY clear", 0xA0, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+            ) { _, opcode, imm, target, expectedZ, expectedN, initialStatus ->
+                val cpu = setupCpuWithInstruction(opcode, imm)
+                cpu.status = initialStatus
+
+                val cycles = cpu.step()
+
+                val reg = when (target) {
+                    'A' -> cpu.a
+                    'X' -> cpu.x
+                    'Y' -> cpu.y
+                    else -> error("Unknown target $target")
+                }
+                reg shouldBe imm
+                (cpu.status and FLAG_ZERO) shouldBe expectedZ
+                (cpu.status and FLAG_NEGATIVE) shouldBe expectedN
+                cycles shouldBe 2
+            }
         }
+    }
 
-        "should set the zero flag when loading 0" {
-            val cpu = setupCpuWithInstruction(0xA9, 0x00)
+    "STA absolute instruction" - {
+        "should write A to a CPU RAM address and not touch flags" {
+            // Program: 8D 42 00  (STA $0042)
+            val cpu = setupCpuWithInstruction(0x8D, 0x42, 0x00)
+            cpu.a = 0xAB
+            cpu.status = FLAG_ZERO or FLAG_NEGATIVE // pre-set some flags
 
             val cycles = cpu.step()
 
-            cpu.accumulator shouldBe 0x00
+            // Value stored to $0042 (CPU RAM)
+            cpu.memory.read(0x0042) shouldBe 0xAB
+            // Flags unchanged
             cpu.status and FLAG_ZERO shouldBe FLAG_ZERO
-            cpu.status and FLAG_NEGATIVE shouldBe 0
-            cycles shouldBe 2
-        }
-
-        "should set the negative flag when loading a value with bit 7 set" {
-            val cpu = setupCpuWithInstruction(0xA9, 0x80)
-
-            val cycles = cpu.step()
-
-            cpu.accumulator shouldBe 0x80
-            cpu.status and FLAG_ZERO shouldBe 0
             cpu.status and FLAG_NEGATIVE shouldBe FLAG_NEGATIVE
-            cycles shouldBe 2
-        }
-
-        "should clear zero and negative flags if they were set and the loaded value is positive and non-zero" {
-            val cpu = setupCpuWithInstruction(0xA9, 0x10)
-            cpu.status = FLAG_ZERO or FLAG_NEGATIVE
-
-            val cycles = cpu.step()
-
-            cpu.accumulator shouldBe 0x10
-            cpu.status and FLAG_ZERO shouldBe 0
-            cpu.status and FLAG_NEGATIVE shouldBe 0
-            cycles shouldBe 2
+            // Cycles for STA abs = 4
+            cycles shouldBe 4
         }
     }
 })

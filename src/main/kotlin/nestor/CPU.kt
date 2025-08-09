@@ -11,7 +11,9 @@ class CPU(
 ) {
     var pc: Int = 0
     var status: Int = 0
-    var accumulator: Int = 0
+    var a: Int = 0
+    var x: Int = 0
+    var y: Int = 0
 
     fun reset() {
         val lo = memory.read(0xFFFC)
@@ -28,30 +30,42 @@ class CPU(
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
         0x78 -> sei()
+        0x8D -> sdaAbsolute()
+        0xA0 -> ldyImmediate()
+        0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
         0xD8 -> cld()
         0xEA -> noop()
         else -> unknown(opcode)
     }
 
-    // Load accumulator immediate
-    private fun ldaImmediate() = 2.also {
-        accumulator = readNextByte()
-        if (accumulator == 0) {
-            setStatusFlag(FLAG_ZERO)
-        } else {
-            clearStatusFlag(FLAG_ZERO)
-        }
-        if ((accumulator and 0x80) != 0) {
-            setStatusFlag(FLAG_NEGATIVE)
-        } else {
-            clearStatusFlag(FLAG_NEGATIVE)
-        }
-    }
-
     // Set interrupt
     private fun sei() = 2.also {
         setStatusFlag(FLAG_INTERRUPT_DISABLE)
+    }
+
+    // Store accumulator absolute addressing
+    private fun sdaAbsolute() = 4.also {
+        val address = readNextWord()
+        memory.write(address, a)
+    }
+
+    // Load X immediate
+    private fun ldxImmediate() = 2.also {
+        x = readNextByte()
+        setZN(x)
+    }
+
+    // Load Y immediate
+    private fun ldyImmediate() = 2.also {
+        y = readNextByte()
+        setZN(y)
+    }
+
+    // Load accumulator immediate
+    private fun ldaImmediate() = 2.also {
+        a = readNextByte()
+        setZN(a)
     }
 
     // Clear decimal
@@ -64,6 +78,12 @@ class CPU(
 
     private fun unknown(opcode: Int) = 1.also {
         println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
+    }
+
+    // Update Zero/Negative for any 8-bit value
+    private fun setZN(value: Int) {
+        if ((value and 0xFF) == 0) setStatusFlag(FLAG_ZERO) else clearStatusFlag(FLAG_ZERO)
+        if ((value and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
     }
 
     private fun setStatusFlag(flag: Int) {
