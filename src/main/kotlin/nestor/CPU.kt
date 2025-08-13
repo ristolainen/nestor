@@ -36,6 +36,9 @@ class CPU(
         0xA0 -> ldyImmediate()
         0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
+        0xAC -> ldyAbsolute()
+        0xAD -> ldaAbsolute()
+        0xAE -> ldxAbsolute()
         0xD8 -> cld()
         0xEA -> noop()
         else -> unknown(opcode)
@@ -73,6 +76,27 @@ class CPU(
     private fun ldaImmediate() = 2.also {
         a = readNextByte()
         setZN(a)
+    }
+
+    // Load accumulator absolute
+    private fun ldaAbsolute() = 4.also {
+        val address = readNextWord()
+        a = memory.read(address)
+        setZN(a)
+    }
+
+    // Load X absolute
+    private fun ldxAbsolute() = 4.also {
+        val address = readNextWord()
+        x = memory.read(address)
+        setZN(x)
+    }
+
+    // Load Y absolute
+    private fun ldyAbsolute() = 4.also {
+        val address = readNextWord()
+        y = memory.read(address)
+        setZN(y)
     }
 
     // Clear decimal

@@ -92,6 +92,55 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "Absolute loads (LDA/LDX/LDY)" - {
+        "should load from absolute address and set Z/N correctly" {
+            io.kotest.data.forAll(
+                // label, opcode, addrLo, addrHi, memVal, targetReg, expectedZ, expectedN, initialStatus
+                row("LDA non-zero", 0xAD, 0x10, 0x00, 0x42, 'A', 0, 0, 0),
+                row("LDA zero",     0xAD, 0x20, 0x00, 0x00, 'A', FLAG_ZERO, 0, 0),
+                row("LDA neg",      0xAD, 0x30, 0x00, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
+                row("LDA clear",    0xAD, 0x40, 0x00, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+
+                row("LDX non-zero", 0xAE, 0x50, 0x00, 0x42, 'X', 0, 0, 0),
+                row("LDX zero",     0xAE, 0x60, 0x00, 0x00, 'X', FLAG_ZERO, 0, 0),
+                row("LDX neg",      0xAE, 0x70, 0x00, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
+                row("LDX clear",    0xAE, 0x80, 0x00, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+
+                row("LDY non-zero", 0xAC, 0x90, 0x00, 0x33, 'Y', 0, 0, 0),
+                row("LDY zero",     0xAC, 0xA0, 0x00, 0x00, 'Y', FLAG_ZERO, 0, 0),
+                row("LDY neg",      0xAC, 0xB0, 0x00, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
+                row("LDY clear",    0xAC, 0xC0, 0x00, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+            ) { _, opcode, lo, hi, memVal, target, expectedZ, expectedN, initialStatus ->
+                val absAddr = (hi shl 8) or lo
+
+                // Place instruction (opcode + 16-bit address) at PC
+                val cpu = setupCpuWithInstruction(opcode, lo, hi)
+
+                // Seed the absolute address in CPU RAM with the value we expect to load.
+                // MemoryBus.write() maps $0000-$1FFF to internal RAM (mirrored), so this works for our addresses.
+                cpu.memory.write(absAddr, memVal)
+
+                // Set starting status flags
+                cpu.status = initialStatus
+
+                val cycles = cpu.step()
+
+                val reg = when (target) {
+                    'A' -> cpu.a
+                    'X' -> cpu.x
+                    'Y' -> cpu.y
+                    else -> error("Unknown target $target")
+                }
+
+                reg shouldBe memVal
+                (cpu.status and FLAG_ZERO) shouldBe expectedZ
+                (cpu.status and FLAG_NEGATIVE) shouldBe expectedN
+                cycles shouldBe 4
+            }
+        }
+    }
+
+
     "STA absolute instruction" - {
         "should write A to a CPU RAM address and not touch flags" {
             // Program: 8D 42 00  (STA $0042)
