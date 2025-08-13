@@ -140,6 +140,47 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "Branches (BPL/BMI/BEQ/BNE/BCS/BCC/BVS/BVC)" - {
+        fun targetPc(startPC: Int, offset: Int): Int {
+            val nextPC = (startPC + 2) and 0xFFFF
+            val off = offset.toByte().toInt()           // sign-extend [-128,127]
+            return (nextPC + off) and 0xFFFF
+        }
+        forAll(
+            // label, opcode, initialStatus, offset, startPC, expectTaken, expectCycles
+
+            // --- BPL (branch if !N) / BMI (branch if N) ---
+            row("BPL not taken (N set)",   0x10, FLAG_NEGATIVE, 0x05, 0x8000, false, 2),
+            row("BPL taken no cross",      0x10, 0,             0x05, 0x8000, true,  3),
+
+            // page-cross downward: nextPC=$8102, target=$80FC
+            row("BMI taken page cross",    0x30, FLAG_NEGATIVE, 0xFA, 0x8100, true,  4),
+
+            // --- BEQ (branch if Z) / BNE (branch if !Z) ---
+            row("BEQ taken no cross",      0xF0, FLAG_ZERO,     0x05, 0x8080, true,  3),
+            row("BNE not taken (Z set)",   0xD0, FLAG_ZERO,     0x20, 0x8090, false, 2),
+
+            // --- BCS (branch if C) / BCC (branch if !C) ---
+            row("BCS taken no cross",      0xB0, FLAG_CARRY,    0x01, 0x8100, true,  3),
+
+            // page-cross upward: nextPC=$80FF, target=$8100
+            row("BCC taken page cross",    0x90, 0,             0x01, 0x80FD, true,  4),
+
+            // --- BVS (branch if V) / BVC (branch if !V) ---
+            row("BVS taken no cross",      0x70, FLAG_OVERFLOW, 0x10, 0x80A0, true,  3),
+            row("BVC not taken (V set)",   0x50, FLAG_OVERFLOW, 0x10, 0x80A0, false, 2),
+        ) { label, opcode, initialStatus, offset, startPC, expectTaken, expectCycles ->
+
+            val cpu = setupCpuWithInstruction(opcode, offset, address = startPC)
+            cpu.status = initialStatus
+
+            val cycles = cpu.step() // fetch via readNextByte(); branch helper decides & maybe updates pc:contentReference[oaicite:1]{index=1}
+
+            val expectedPc = if (expectTaken) targetPc(startPC, offset) else (startPC + 2) and 0xFFFF
+            cpu.pc shouldBe expectedPc
+            cycles shouldBe expectCycles
+        }
+    }
 
     "STA absolute instruction" - {
         "should write A to a CPU RAM address and not touch flags" {

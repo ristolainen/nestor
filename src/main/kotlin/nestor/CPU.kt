@@ -4,7 +4,8 @@ const val FLAG_CARRY                = 0b00000001
 const val FLAG_ZERO                 = 0b00000010
 const val FLAG_INTERRUPT_DISABLE    = 0b00000100
 const val FLAG_DECIMAL              = 0b00001000
-const val FLAG_NEGATIVE             = 0b01000000
+const val FLAG_OVERFLOW             = 0b01000000
+const val FLAG_NEGATIVE             = 0b10000000
 
 class CPU(
     val memory: MemoryBus,
@@ -30,8 +31,13 @@ class CPU(
     }
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
+        0x10 -> bpl()
+        0x30 -> bmi()
+        0x50 -> bvc()
+        0x70 -> bvs()
         0x78 -> sei()
         0x8D -> sdaAbsolute()
+        0x90 -> bcc()
         0x9A -> txs()
         0xA0 -> ldyImmediate()
         0xA2 -> ldxImmediate()
@@ -39,10 +45,25 @@ class CPU(
         0xAC -> ldyAbsolute()
         0xAD -> ldaAbsolute()
         0xAE -> ldxAbsolute()
+        0xB0 -> bcs()
+        0xD0 -> bne()
         0xD8 -> cld()
         0xEA -> noop()
+        0xF0 -> beq()
         else -> unknown(opcode)
     }
+
+    // Branch if plus
+    private fun bpl() = branchIf(!nSet())
+
+    // Branch if minus
+    private fun bmi() = branchIf(nSet())
+
+    // Branch if overflow clear
+    private fun bvc() = branchIf(!oSet())
+
+    // Branch if overflow set
+    private fun bvs() = branchIf(oSet())
 
     // Set interrupt
     private fun sei() = 2.also {
@@ -54,6 +75,9 @@ class CPU(
         val address = readNextWord()
         memory.write(address, a)
     }
+
+    // Branch if carry clear
+    private fun bcc() = branchIf(!cSet())
 
     // Transfer X to stack pointer
     private fun txs() = 2.also {
@@ -92,6 +116,12 @@ class CPU(
         setZN(x)
     }
 
+    // Branch if carry set
+    private fun bcs() = branchIf(cSet())
+
+    // Branch if not equal
+    private fun bne() = branchIf(!zSet())
+
     // Load Y absolute
     private fun ldyAbsolute() = 4.also {
         val address = readNextWord()
@@ -106,6 +136,9 @@ class CPU(
 
     // No-op
     private fun noop() = 2
+
+    // Branch if equal
+    private fun beq() = branchIf(zSet())
 
     private fun unknown(opcode: Int) = 1.also {
         println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
@@ -125,6 +158,19 @@ class CPU(
         status = status and flag.inv()
     }
 
+    private fun branchIf(condition: Boolean): Int {
+        val offset = readNextByte().toByte().toInt()
+        var cycles = 2
+
+        if (condition) {
+            val target = (pc + offset) and 0xFFFF
+            cycles += 1
+            if ((pc and 0xFF00) != (target and 0xFF00)) cycles += 1
+            pc = target
+        }
+        return cycles
+    }
+
     private fun readNextByte(): Int {
         val value = memory.read(pc)
         pc = (pc + 1) and 0xFFFF
@@ -136,4 +182,9 @@ class CPU(
         val hi = readNextByte()
         return (hi shl 8) or lo
     }
+
+    private fun nSet() = (status and FLAG_NEGATIVE) != 0
+    private fun zSet() = (status and FLAG_ZERO) != 0
+    private fun cSet() = (status and FLAG_CARRY) != 0
+    private fun oSet() = (status and FLAG_OVERFLOW) != 0
 }

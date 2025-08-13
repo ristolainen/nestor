@@ -27,12 +27,12 @@ fun main() {
         frame.isVisible = true
     }
 
-    ppu.renderFrame()
-    screen.draw(ppu.currentFrame())
+    //ppu.renderFrame()
+    //screen.draw(ppu.currentFrame())
 
     val cpu = CPU(memoryBus)
     val emulation = Emulation(cpu, ppu)
-    emulation.runAFewTicks()
+    emulation.runFrame()
 
     ppu.renderFrame()
     screen.draw(ppu.currentFrame())

@@ -31,7 +31,7 @@ class Emulation(
         println("Running a few ticks")
         cpu.reset()
         var cycles = 0
-        while (cycles < 100) {
+        while (cycles < 10000) {
             val cpuCycles = cpu.step()
             ppu.tick(cpuCycles * 3)
             cycles += cpuCycles
