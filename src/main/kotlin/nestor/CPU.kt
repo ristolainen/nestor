@@ -10,6 +10,7 @@ const val FLAG_NEGATIVE             = 0b10000000
 class CPU(
     val memory: MemoryBus,
 ) {
+    var cycles: Long = 0
     var pc: Int = 0
     var status: Int = 0
     var a: Int = 0
@@ -51,7 +52,7 @@ class CPU(
         0xEA -> noop()
         0xF0 -> beq()
         else -> unknown(opcode)
-    }
+    }.also { cycles += it }
 
     // Branch if plus
     private fun bpl() = branchIf(!nSet())

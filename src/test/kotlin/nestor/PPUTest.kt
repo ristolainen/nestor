@@ -4,6 +4,56 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.shouldBe
 
 class PPUTest : FreeSpec({
+    "tick" - {
+        "should set VBLANK at the start of scanline 241" {
+            val tile = makeCheckerboardTile()
+            val ppu = PPU(listOf(tile))
+
+            // Put the PPU right before the wrap that advances to scanline 241.
+            ppu.scanline = 240
+            ppu.cycle = 340
+
+            // Advance one PPU cycle -> wraps cycle, increments scanline to 241, sets VBLANK.
+            ppu.tick(1)
+
+            ppu.scanline shouldBe 241
+            (ppu.status and STATUS_VBLANK) shouldBe STATUS_VBLANK // VBlank flag set
+        }
+
+        "should clear VBLANK on the pre-render line (scanline 261) and reset writeToggle" {
+            val tile = makeCheckerboardTile()
+            val ppu = PPU(listOf(tile))
+
+            // Force VBLANK on so we can verify it clears at 261.
+            ppu.status = ppu.status or STATUS_VBLANK
+            ppu.writeToggle = true
+
+            // Step from end of scanline 260 into 261.
+            ppu.scanline = 260
+            ppu.cycle = 340
+            ppu.tick(1)
+
+            ppu.scanline shouldBe 261
+            (ppu.status and STATUS_VBLANK) shouldBe 0          // VBlank cleared
+            ppu.writeToggle shouldBe false                     // latch reset
+        }
+
+        "readStatus ($2002) should clear VBLANK and reset the address latch (writeToggle)" {
+            val tile = makeCheckerboardTile()
+            val ppu = PPU(listOf(tile))
+
+            // Set VBLANK and toggle latch to verify side effects of reading $2002.
+            ppu.status = ppu.status or STATUS_VBLANK
+            ppu.writeToggle = true
+
+            // CPU read of PPUSTATUS ($2002).
+            ppu.cpuRead(0x2002)
+
+            (ppu.status and STATUS_VBLANK) shouldBe 0          // VBlank cleared on read
+            ppu.writeToggle shouldBe false                     // latch reset on read
+        }
+    }
+
     "renderFrame" - {
         fun writePpuAddr(memoryBus: MemoryBus, addr: Int) {
             memoryBus.write(0x2006, (addr shr 8) and 0xFF)

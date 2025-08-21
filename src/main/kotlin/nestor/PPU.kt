@@ -16,6 +16,8 @@ const val OAM_RAM_SIZE = 256
 const val NAMETABLE_START = 0x2000
 const val PALETTE_START = 0x3F00
 
+const val STATUS_VBLANK = 0b10000000
+
 class PPU(
     val tiles: List<Array<IntArray>>,
 ) {
@@ -36,9 +38,31 @@ class PPU(
     internal var ppuDataBuffer: Byte = 0
     internal var vramAddr: Int = 0
     internal var writeToggle = false
+    internal var scanline = 0
+    internal var cycle = 0
+    internal var frame: Long = 0
 
     fun tick(cycles: Int) {
-        // TODO: Implement tick behaviour
+        repeat(cycles) {
+            cycle++
+            if (cycle > 340) {
+                cycle = 0
+                scanline++
+                when (scanline) {
+                    241 -> { // start of VBlank
+                        setStatusFlag(STATUS_VBLANK)
+                    }
+                    261 -> { // pre-render line
+                        clearStatusFlag(STATUS_VBLANK)
+                        writeToggle = false
+                    }
+                }
+                if (scanline >= 262) {
+                    scanline = 0
+                    frame++
+                }
+            }
+        }
     }
 
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
@@ -63,7 +87,7 @@ class PPU(
 
     private fun readStatus(): Int {
         val result = status or (status and 0xE0) // NMI + sprite flags
-        status = status and 0x7F // Clear VBlank bit (bit 7)
+        clearStatusFlag(STATUS_VBLANK)
         writeToggle = false      // Reset address latch
         return result
     }
@@ -265,5 +289,13 @@ class PPU(
             nesPalette[color2Index],
             nesPalette[color3Index],
         )
+    }
+
+    private fun setStatusFlag(flag: Int) {
+        status = status or flag
+    }
+
+    private fun clearStatusFlag(flag: Int) {
+        status = status and flag.inv()
     }
 }

@@ -10,6 +10,7 @@ package nestor
 class Emulation(
     val cpu: CPU,
     val ppu: PPU,
+    val memoryBus: MemoryBus,
 ) {
     fun run() {
         println("Nestor NES Emulator starting...")
@@ -21,9 +22,7 @@ class Emulation(
         cpu.reset()
         var cycles = 0
         while (cycles < 29780) {
-            val cpuCycles = cpu.step()
-            ppu.tick(cpuCycles * 3)
-            cycles += cpuCycles
+            cycles += step()
         }
     }
 
@@ -31,10 +30,14 @@ class Emulation(
         println("Running a few ticks")
         cpu.reset()
         var cycles = 0
-        while (cycles < 10000) {
-            val cpuCycles = cpu.step()
-            ppu.tick(cpuCycles * 3)
-            cycles += cpuCycles
+        while (cycles < 60000) {
+            cycles += step()
         }
+    }
+
+    private fun step() = Trace.traceOnce(cpu, ppu, memoryBus) {
+        val cpuCycles = cpu.step()
+        ppu.tick(cpuCycles * 3)
+        cpuCycles
     }
 }

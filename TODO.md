@@ -20,14 +20,14 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 
 ## 🧠 Phase 2: Run Game Intro (CPU + PPU)
 
-- [ ] Implement CPU instruction fetch/decode loop
+- [x] Implement CPU instruction fetch/decode loop
 - [ ] Support basic 6502 opcodes:
     - [ ] NOP, LDA, STA, JMP, JSR, RTS
     - [ ] INC/DEC, Branches, Arithmetic ops
     - [ ] Full addressing modes
-- [ ] Hook up memory bus (read/write logic)
+- [x] Hook up memory bus (read/write logic)
 - [ ] Implement I/O register stubs (PPU, input)
-- [ ] Tie CPU and PPU timing (3 PPU cycles per CPU cycle)
+- [x] Tie CPU and PPU timing (3 PPU cycles per CPU cycle)
 - [ ] Implement PPU scroll handling and VBlank
 - [ ] Trigger NMI interrupt on VBlank
 - [ ] Frame timing: simulate 60 FPS
