@@ -8,15 +8,28 @@ fun main() {
     val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
     // val rom = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
     val inesRom = RomReader.read(rom)
-    println(inesRom.header)
 
     val tiles = TileParser.parseTiles(inesRom.chrData)
     val ppu = PPU(tiles)
     val memoryBus = MemoryBus(ppu, inesRom.prgData)
-    fakePalette(memoryBus)
-    fakeNameTables(memoryBus)
+    //fakePalette(memoryBus)
+    //fakeNameTables(memoryBus)
 
     val screen = ScreenRenderer()
+    //displayScreen(screen)
+
+    //ppu.renderFrame()
+    //screen.draw(ppu.currentFrame())
+
+    val cpu = CPU(memoryBus)
+    val emulation = Emulation(cpu, ppu, memoryBus)
+    emulation.runAFewTicks()
+
+    //ppu.renderFrame()
+    //screen.draw(ppu.currentFrame())
+}
+
+private fun displayScreen(screen: ScreenRenderer) {
     SwingUtilities.invokeLater {
         val frame = JFrame("Nestor NES Emulator")
         frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
@@ -26,16 +39,6 @@ fun main() {
         frame.setLocationRelativeTo(null)
         frame.isVisible = true
     }
-
-    //ppu.renderFrame()
-    //screen.draw(ppu.currentFrame())
-
-    val cpu = CPU(memoryBus)
-    val emulation = Emulation(cpu, ppu, memoryBus)
-    emulation.runAFewTicks()
-
-    ppu.renderFrame()
-    screen.draw(ppu.currentFrame())
 }
 
 private fun fakePalette(memoryBus: MemoryBus) {

@@ -47,6 +47,8 @@ class CPU(
         0xAD -> ldaAbsolute()
         0xAE -> ldxAbsolute()
         0xB0 -> bcs()
+        0xB9 -> ldaAbsoluteM(y)
+        0xBD -> ldaAbsoluteM(x)
         0xD0 -> bne()
         0xD8 -> cld()
         0xEA -> noop()
@@ -120,6 +122,15 @@ class CPU(
     // Branch if carry set
     private fun bcs() = branchIf(cSet())
 
+    // Load A absolute X or Y
+    private fun ldaAbsoluteM(m: Int): Int {
+        val base = readNextWord()
+        val address = (base + m).to16bits()
+        a = memory.read(address)
+        setZN(a)
+        return 4 + crossPageCycles(base, address)
+    }
+
     // Branch if not equal
     private fun bne() = branchIf(!zSet())
 
@@ -164,9 +175,8 @@ class CPU(
         var cycles = 2
 
         if (condition) {
-            val target = (pc + offset) and 0xFFFF
-            cycles += 1
-            if ((pc and 0xFF00) != (target and 0xFF00)) cycles += 1
+            val target = (pc + offset).to16bits()
+            cycles += 1 + crossPageCycles(pc, target)
             pc = target
         }
         return cycles
@@ -174,7 +184,7 @@ class CPU(
 
     private fun readNextByte(): Int {
         val value = memory.read(pc)
-        pc = (pc + 1) and 0xFFFF
+        pc = (pc + 1).to16bits()
         return value
     }
 
@@ -183,6 +193,11 @@ class CPU(
         val hi = readNextByte()
         return (hi shl 8) or lo
     }
+
+    private fun crossedPage(a: Int, b: Int) = a.highByte() != b.highByte()
+
+    private fun crossPageCycles(a: Int, b:Int) =
+        if(crossedPage(a, b)) 1 else 0
 
     private fun nSet() = (status and FLAG_NEGATIVE) != 0
     private fun zSet() = (status and FLAG_ZERO) != 0
