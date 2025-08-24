@@ -13,7 +13,7 @@ class CPU(
     var cycles: Long = 0
 
     var status: Int = 0
-        set(value) { field = ((value and 0xFF) or 0x20) }
+        set(value) { field = value and 0xFF }
 
     var a: Int = 0
         set(value) { field = value and 0xFF }

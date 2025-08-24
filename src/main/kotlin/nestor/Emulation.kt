@@ -30,7 +30,7 @@ class Emulation(
         println("Running a few ticks")
         cpu.reset()
         var cycles = 0
-        while (cycles < 60000) {
+        while (cycles < 100000) {
             cycles += step()
         }
     }
