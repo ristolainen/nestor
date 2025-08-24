@@ -213,9 +213,11 @@ class CPUTest : FreeSpec({
         }
 
         "should add +1 cycle on page cross" {
-            val lo = 0xFF; val hi = 0x00; val yVal = 0x01  // base=$00FF, eff=$0100 (page cross in RAM)
+            val lo = 0xFF;
+            val hi = 0x00;
+            val yVal = 0x01  // base=$00FF, eff=$0100 (page cross in RAM)
             val base = (hi shl 8) or lo
-            val eff  = (base + yVal) and 0xFFFF
+            val eff = (base + yVal) and 0xFFFF
 
             val cpu = setupCpuWithInstruction(0xB9, lo, hi) // LDA abs,Y
             cpu.memory.write(eff, 0x2A)                     // writes to CPU RAM
@@ -391,6 +393,81 @@ class CPUTest : FreeSpec({
             (cpu.status and FLAG_ZERO) shouldBe 0
             (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
             cycles shouldBe 2
+        }
+    }
+
+    "JSR absolute" - {
+        "pushes (PC-1) and jumps; 6 cycles" {
+            // opcode at $8000, operand = $C123
+            val cpu = setupCpuWithInstruction(0x20, 0x23, 0xC1)
+            cpu.sp = 0xFF
+
+            val cycles = cpu.step()
+
+            cpu.pc shouldBe 0xC123
+            cpu.sp shouldBe 0xFD                       // pushed two bytes
+
+            // top of stack has high then low of (PC-1) = $8002
+            cpu.memory.read(0x01FF) shouldBe 0x80      // high
+            cpu.memory.read(0x01FE) shouldBe 0x02      // low
+            cycles shouldBe 6
+        }
+    }
+
+    "RTS instruction" - {
+
+        "returns to the instruction after JSR; pulls two bytes; 6 cycles" {
+            // Arrange: opcode RTS at $8000
+            val cpu = setupCpuWithInstruction(0x60)
+            // Simulate post-JSR stack: JSR pushed (PC-1) = $8002
+            cpu.sp = 0xFD
+            cpu.memory.write(0x01FE, 0x02)   // low byte
+            cpu.memory.write(0x01FF, 0x80)   // high byte
+
+            val originalStatus = 0b10100101
+            cpu.status = originalStatus
+
+            // Act
+            val cycles = cpu.step()
+
+            // Assert
+            cpu.pc shouldBe 0x8003            // incremented to AFTER the JSR
+            cpu.sp shouldBe 0xFF              // pulled two bytes
+            cpu.status shouldBe originalStatus // RTS does not affect flags
+            cycles shouldBe 6
+        }
+
+        "increments across page boundary (e.g., $80FF -> $8100)" {
+            val cpu = setupCpuWithInstruction(0x60)
+            cpu.sp = 0xFD
+            // Return address on stack = $80FF; RTS should set PC to $8100
+            cpu.memory.write(0x01FE, 0xFF)   // low
+            cpu.memory.write(0x01FF, 0x80)   // high
+
+            val cycles = cpu.step()
+
+            cpu.pc shouldBe 0x8100
+            cpu.sp shouldBe 0xFF
+            cycles shouldBe 6
+        }
+
+        "does not corrupt extra stack bytes (only two pulls)" {
+            val cpu = setupCpuWithInstruction(0x60)
+            cpu.sp = 0xFC
+            // Stack layout:
+            // 0x01FD : sentinel
+            // 0x01FE : low of return
+            // 0x01FF : high of return
+            cpu.memory.write(0x01FD, 0xAA)
+            cpu.memory.write(0x01FE, 0x02)
+            cpu.memory.write(0x01FF, 0x80)
+
+            cpu.step()
+
+            // Only two pulls → SP ends at 0xFE after pulling 0x01FF, then 0xFF (so 0x01FD remains)
+            cpu.sp shouldBe ((0xFC + 2) and 0xFF)
+            // More explicit check: the sentinel still there
+            cpu.memory.read(0x01FD) shouldBe 0xAA
         }
     }
 })

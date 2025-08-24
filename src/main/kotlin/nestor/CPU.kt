@@ -1,11 +1,11 @@
 package nestor
 
-const val FLAG_CARRY                = 0b00000001
-const val FLAG_ZERO                 = 0b00000010
-const val FLAG_INTERRUPT_DISABLE    = 0b00000100
-const val FLAG_DECIMAL              = 0b00001000
-const val FLAG_OVERFLOW             = 0b01000000
-const val FLAG_NEGATIVE             = 0b10000000
+const val FLAG_CARRY = 0b00000001
+const val FLAG_ZERO = 0b00000010
+const val FLAG_INTERRUPT_DISABLE = 0b00000100
+const val FLAG_DECIMAL = 0b00001000
+const val FLAG_OVERFLOW = 0b01000000
+const val FLAG_NEGATIVE = 0b10000000
 
 class CPU(
     val memory: MemoryBus,
@@ -13,29 +13,41 @@ class CPU(
     var cycles: Long = 0
 
     var status: Int = 0
-        set(value) { field = value and 0xFF }
+        set(value) {
+            field = value and 0xFF
+        }
 
     var a: Int = 0
-        set(value) { field = value and 0xFF }
+        set(value) {
+            field = value and 0xFF
+        }
 
     var x: Int = 0
-        set(value) { field = value and 0xFF }
+        set(value) {
+            field = value and 0xFF
+        }
 
     var y: Int = 0
-        set(value) { field = value and 0xFF }
+        set(value) {
+            field = value and 0xFF
+        }
 
     var sp: Int = 0
-        set(value) { field = value and 0xFF }
+        set(value) {
+            field = value and 0xFF
+        }
 
     var pc: Int = 0
-        set(value) { field = value and 0xFFFF }
+        set(value) {
+            field = value and 0xFFFF
+        }
 
     var abort = false
 
     fun reset() {
         val lo = memory.read(0xFFFC)
         val hi = memory.read(0xFFFD)
-        pc = (hi shl 8) or lo
+        pc = word(hi, lo)
 
         status = 0x24
     }
@@ -47,8 +59,10 @@ class CPU(
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
         0x10 -> bpl()
+        0x20 -> jsr()
         0x30 -> bmi()
         0x50 -> bvc()
+        0x60 -> rts()
         0x70 -> bvs()
         0x78 -> sei()
         0x8D -> sdaAbsolute()
@@ -75,11 +89,28 @@ class CPU(
     // Branch if plus
     private fun bpl() = branchIf(!nSet())
 
+    // Jump to Subroutine
+    private fun jsr() = 6.also {
+        val target = readNextWord()
+        val ret = (pc - 1).to16bits()
+        push(ret.highByte())
+        push(ret.lowByte())
+        pc = target
+    }
+
     // Branch if minus
     private fun bmi() = branchIf(nSet())
 
     // Branch if overflow clear
     private fun bvc() = branchIf(!oSet())
+
+    // Return from subroutine
+    private fun rts() = 6.also {
+        val lo = pull()
+        val hi = pull()
+        val ret = word(hi, lo)
+        pc = ret + 1
+    }
 
     // Branch if overflow set
     private fun bvs() = branchIf(oSet())
@@ -223,13 +254,23 @@ class CPU(
     private fun readNextWord(): Int {
         val lo = readNextByte()
         val hi = readNextByte()
-        return (hi shl 8) or lo
+        return word(hi, lo)
+    }
+
+    private fun push(v: Int) {
+        memory.write(0x0100 + sp, v.to8bits())
+        sp -= 1
+    }
+
+    private fun pull(): Int {
+        sp += 1
+        return memory.read(0x0100 + sp)
     }
 
     private fun crossedPage(a: Int, b: Int) = a.highByte() != b.highByte()
 
-    private fun crossPageCycles(a: Int, b:Int) =
-        if(crossedPage(a, b)) 1 else 0
+    private fun crossPageCycles(a: Int, b: Int) =
+        if (crossedPage(a, b)) 1 else 0
 
     private fun nSet() = (status and FLAG_NEGATIVE) != 0
     private fun zSet() = (status and FLAG_ZERO) != 0
