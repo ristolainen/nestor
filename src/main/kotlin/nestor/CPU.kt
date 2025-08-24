@@ -30,6 +30,8 @@ class CPU(
     var pc: Int = 0
         set(value) { field = value and 0xFFFF }
 
+    var abort = false
+
     fun reset() {
         val lo = memory.read(0xFFFC)
         val hi = memory.read(0xFFFD)
@@ -62,6 +64,7 @@ class CPU(
         0xB9 -> ldaAbsoluteM(y)
         0xBD -> ldaAbsoluteM(x)
         0xC9 -> cmpImmediate()
+        0xCA -> dex()
         0xD0 -> bne()
         0xD8 -> cld()
         0xEA -> noop()
@@ -153,6 +156,12 @@ class CPU(
         if ((diff and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
     }
 
+    // Decrement X
+    private fun dex() = 2.also {
+        x -= 1
+        setZN(x)
+    }
+
     // Branch if not equal
     private fun bne() = branchIf(!zSet())
 
@@ -176,6 +185,7 @@ class CPU(
 
     private fun unknown(opcode: Int) = 1.also {
         println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
+        abort = true
     }
 
     // Update Zero/Negative for any 8-bit value

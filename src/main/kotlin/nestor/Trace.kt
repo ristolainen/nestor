@@ -102,7 +102,10 @@ object Trace {
             append("\"bytes\":[")
             f.cpu.instrBytes.forEachIndexed { i, b ->
                 if (i > 0) append(',')
-                append(b)
+                when (i) {
+                    0 -> append(b.hex())
+                    else -> append(b)
+                }
             }
             append("]},")
             append("\"ppu\":{")

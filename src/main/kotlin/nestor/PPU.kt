@@ -128,12 +128,12 @@ class PPU(
     }
 
     private fun writeOamAddr(value: Int) {
-        oamAddr = value and 0xFF
+        oamAddr = value.to8bits()
     }
 
     private fun writeOamData(value: Int) {
         oamRam[oamAddr] = value.toByte()
-        oamAddr = (oamAddr + 1) and 0xFF
+        oamAddr = (oamAddr + 1).to8bits()
     }
 
     private fun writeScroll(value: Int) {

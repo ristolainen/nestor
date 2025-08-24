@@ -30,12 +30,15 @@ class Emulation(
         println("Running a few ticks")
         cpu.reset()
         var cycles = 0
-        while (cycles < 100000) {
+        while (cycles < 120000) {
             cycles += step()
         }
     }
 
     private fun step() = Trace.traceOnce(cpu, ppu, memoryBus) {
+        if (cpu.abort) {
+            System.exit(0)
+        }
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)
         cpuCycles
