@@ -306,4 +306,41 @@ class CPUTest : FreeSpec({
             cycles shouldBe 2
         }
     }
+
+    "CMP immediate" - {
+
+        fun setup(a: Int, imm: Int): Triple<CPU, Int, Int> {
+            val cpu = setupCpuWithInstruction(0xA9, a, 0xC9, imm) // LDA #a ; CMP #imm
+            val cycles = cpu.step() + cpu.step()
+            return Triple(cpu, imm, cycles)
+        }
+
+        "A > M sets C, clears Z and N" {
+            val (cpu, _, _) = setup(0x42, 0x40)
+            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+        }
+
+        "A == M sets C and Z, clears N" {
+            val (cpu, _, _) = setup(0x42, 0x42)
+            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+        }
+
+        "A < M clears C and Z, sets N from bit7 of (A-M)" {
+            val (cpu, _, _) = setup(0x40, 0x42)  // diff = 0xFE
+            (cpu.status and FLAG_CARRY) shouldBe 0
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+        }
+
+        "Borrow case: 0x00 - 0x01 => 0xFF sets N, clears C and Z" {
+            val (cpu, _, _) = setup(0x00, 0x01)
+            (cpu.status and FLAG_CARRY) shouldBe 0
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+        }
+    }
 })

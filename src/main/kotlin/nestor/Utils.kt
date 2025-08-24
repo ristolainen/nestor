@@ -6,6 +6,8 @@ fun Int.hex() = toUInt().toString(16).uppercase()
 
 fun Int.bin() = toUInt().toString(2).padStart(8, '0')
 
+fun Int.to8bits() = this and 0xFF
+
 fun Int.to16bits() = this and 0xFFFF
 
 fun Int.highByte() = (this ushr 8) and 0xFF

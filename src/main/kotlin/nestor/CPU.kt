@@ -11,12 +11,24 @@ class CPU(
     val memory: MemoryBus,
 ) {
     var cycles: Long = 0
-    var pc: Int = 0
+
     var status: Int = 0
+        set(value) { field = ((value and 0xFF) or 0x20) }
+
     var a: Int = 0
+        set(value) { field = value and 0xFF }
+
     var x: Int = 0
+        set(value) { field = value and 0xFF }
+
     var y: Int = 0
+        set(value) { field = value and 0xFF }
+
     var sp: Int = 0
+        set(value) { field = value and 0xFF }
+
+    var pc: Int = 0
+        set(value) { field = value and 0xFFFF }
 
     fun reset() {
         val lo = memory.read(0xFFFC)
@@ -49,6 +61,7 @@ class CPU(
         0xB0 -> bcs()
         0xB9 -> ldaAbsoluteM(y)
         0xBD -> ldaAbsoluteM(x)
+        0xC9 -> cmpImmediate()
         0xD0 -> bne()
         0xD8 -> cld()
         0xEA -> noop()
@@ -84,7 +97,7 @@ class CPU(
 
     // Transfer X to stack pointer
     private fun txs() = 2.also {
-        sp = x and 0xFF
+        sp = x
     }
 
     // Load X immediate
@@ -129,6 +142,15 @@ class CPU(
         a = memory.read(address)
         setZN(a)
         return 4 + crossPageCycles(base, address)
+    }
+
+    // Compare A immediate
+    private fun cmpImmediate() = 2.also {
+        val v = readNextByte()
+        val diff = (a - v).to8bits()
+        if (a >= v) setStatusFlag(FLAG_CARRY) else clearStatusFlag(FLAG_CARRY)
+        if (diff == 0) setStatusFlag(FLAG_ZERO) else clearStatusFlag(FLAG_ZERO)
+        if ((diff and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
     }
 
     // Branch if not equal
