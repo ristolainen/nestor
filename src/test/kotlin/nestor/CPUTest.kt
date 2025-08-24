@@ -294,6 +294,102 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "Store instructions — zero page variants" - {
+
+        data class StoreCase(
+            val label: String,
+            val opcode: Int,
+            val baseZp: Int,
+            val indexReg: Char?,   // 'X', 'Y', or null (no index)
+            val indexVal: Int,     // used when indexReg != null
+            val srcReg: Char,      // 'A', 'X', or 'Y'
+            val srcVal: Int,
+            val expectedCycles: Int
+        )
+
+        "STA/ STX/ STY cover zp and indexed zp (wrap-around too)" {
+            forAll(
+                // ---- STA ----
+                row(StoreCase("STA zp ($10)", 0x85, 0x10, null, 0x00, 'A', 0x42, 3)),
+                row(StoreCase("STA zp,X ($80 + X)", 0x95, 0x80, 'X', 0x05, 'A', 0x7F, 4)),
+                row(StoreCase("STA zp,X wrap (FE+X)", 0x95, 0xFE, 'X', 0x05, 'A', 0x99, 4)), // eff = 0x03
+
+                // ---- STX ----
+                row(StoreCase("STX zp ($20)", 0x86, 0x20, null, 0x00, 'X', 0x33, 3)),
+                row(StoreCase("STX zp,Y ($40 + Y)", 0x96, 0x40, 'Y', 0x0A, 'X', 0x55, 4)),
+                row(StoreCase("STX zp,Y wrap (FF+Y)", 0x96, 0xFF, 'Y', 0x02, 'X', 0xAB, 4)), // eff = 0x01
+
+                // ---- STY ----
+                row(StoreCase("STY zp ($00)", 0x84, 0x00, null, 0x00, 'Y', 0x11, 3)),
+                row(StoreCase("STY zp,X ($7F + X)", 0x94, 0x7F, 'X', 0x02, 'Y', 0xC4, 4)),
+                row(StoreCase("STY zp,X wrap (FD+X)", 0x94, 0xFD, 'X', 0x07, 'Y', 0x80, 4))  // eff = 0x04
+            ) { tc ->
+
+                // Program: [opcode, baseZp]
+                val cpu = setupCpuWithInstruction(tc.opcode, tc.baseZp)
+
+                // Set source register
+                when (tc.srcReg) {
+                    'A' -> cpu.a = tc.srcVal
+                    'X' -> cpu.x = tc.srcVal
+                    'Y' -> cpu.y = tc.srcVal
+                    else -> error("Unexpected srcReg ${tc.srcReg}")
+                }
+
+                // Set index register if used
+                tc.indexReg?.let {
+                    when (it) {
+                        'X' -> cpu.x = tc.indexVal
+                        'Y' -> cpu.y = tc.indexVal
+                        else -> error("Unexpected indexReg $it")
+                    }
+                }
+
+                val cycles = cpu.step()
+
+                // Compute effective zero-page address with 8-bit wrap
+                val eff = when (tc.indexReg) {
+                    'X' -> (tc.baseZp + cpu.x) and 0xFF
+                    'Y' -> (tc.baseZp + cpu.y) and 0xFF
+                    else -> tc.baseZp
+                }
+
+                val expected = when (tc.srcReg) {
+                    'A' -> cpu.a
+                    'X' -> cpu.x
+                    'Y' -> cpu.y
+                    else -> error("Unexpected srcReg ${tc.srcReg}")
+                }
+
+                cpu.memory.read(eff) shouldBe expected
+                cycles shouldBe tc.expectedCycles
+            }
+        }
+    }
+
+    "STA zero page instruction" - {
+        "should store the accumulator into zero page memory" {
+            val cpu = setupCpuWithInstruction(0x85, 0x10) // STA $10
+            cpu.a = 0x42
+
+            val cycles = cpu.step()
+
+            cpu.memory.read(0x0010) shouldBe 0x42
+            cycles shouldBe 3
+        }
+
+        "should overwrite existing value in zero page" {
+            val cpu = setupCpuWithInstruction(0x85, 0x80) // STA $80
+            cpu.memory.write(0x0080, 0x99) // existing value
+            cpu.a = 0x55
+
+            val cycles = cpu.step()
+
+            cpu.memory.read(0x0080) shouldBe 0x55
+            cycles shouldBe 3
+        }
+    }
+
     "TXS instruction" - {
         "should transfer X to stack pointer without affecting flags" {
             val cpu = setupCpuWithInstruction(0x9A) // TXS opcode

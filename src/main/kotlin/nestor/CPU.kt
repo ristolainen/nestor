@@ -65,8 +65,14 @@ class CPU(
         0x60 -> rts()
         0x70 -> bvs()
         0x78 -> sei()
+        0x84 -> styZeroPage()
+        0x85 -> staZeroPage()
+        0x86 -> stxZeroPage()
         0x8D -> sdaAbsolute()
         0x90 -> bcc()
+        0x94 -> styZeroPageX()
+        0x95 -> staZeroPageX()
+        0x96 -> stxZeroPageY()
         0x9A -> txs()
         0xA0 -> ldyImmediate()
         0xA2 -> ldxImmediate()
@@ -118,6 +124,29 @@ class CPU(
     // Set interrupt
     private fun sei() = 2.also {
         setStatusFlag(FLAG_INTERRUPT_DISABLE)
+    }
+
+    // Store accumulator zero page addressing
+    private fun staZeroPage() = 3.also { stZeroPage(a, 0) }
+
+    // Store accumulator with X zero page addressing
+    private fun staZeroPageX() = 4.also { stZeroPage(a, x) }
+
+    // Store X zero page addressing
+    private fun stxZeroPage() = 3.also { stZeroPage(x, 0) }
+
+    // Store X with Y zero page addressing
+    private fun stxZeroPageY() = 4.also { stZeroPage(x, y) }
+
+    // Store Y zero page addressing
+    private fun styZeroPage() = 3.also { stZeroPage(y, 0) }
+
+    // Store Y with X zero page addressing
+    private fun styZeroPageX() = 4.also { stZeroPage(y, x) }
+
+    private fun stZeroPage(v: Int, o: Int) {
+        val address = (readNextByte() + o).to8bits()
+        memory.write(address, v)
     }
 
     // Store accumulator absolute addressing
