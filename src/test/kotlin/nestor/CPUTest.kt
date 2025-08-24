@@ -405,40 +405,90 @@ class CPUTest : FreeSpec({
         }
     }
 
-    "CMP immediate" - {
+    "Compare immediate (CMP/CPX/CPY)" - {
 
-        fun setup(a: Int, imm: Int): Triple<CPU, Int, Int> {
-            val cpu = setupCpuWithInstruction(0xA9, a, 0xC9, imm) // LDA #a ; CMP #imm
+        fun setup(loadOp: Int, regVal: Int, cmpOp: Int, imm: Int): Triple<CPU, Int, Int> {
+            // e.g. LDA #regVal ; CMP #imm  or  LDX #regVal ; CPX #imm, etc.
+            val cpu = setupCpuWithInstruction(loadOp, regVal, cmpOp, imm)
             val cycles = cpu.step() + cpu.step()
             return Triple(cpu, imm, cycles)
         }
 
-        "A > M sets C, clears Z and N" {
-            val (cpu, _, _) = setup(0x42, 0x40)
-            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-        }
+        // Rows: label, load opcode, compare opcode, reg selector, reg value, imm, expected C, expected Z, expected N
+        io.kotest.data.forAll(
+            // ----- A with CMP ($C9) -----
+            row(
+                "A > M sets C, !Z, !N",
+                0xA9, 0xC9, 'A', 0x42, 0x40, FLAG_CARRY, 0, 0
+            ),
+            row(
+                "A == M sets C and Z, !N",
+                0xA9, 0xC9, 'A', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+            ),
+            row(
+                "A < M clears C/Z, sets N from (A-M)",
+                0xA9, 0xC9, 'A', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+            ),
+            row(
+                "A borrow: 0x00-0x01 → 0xFF sets N, clears C/Z",
+                0xA9, 0xC9, 'A', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+            ),
 
-        "A == M sets C and Z, clears N" {
-            val (cpu, _, _) = setup(0x42, 0x42)
-            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
-            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-        }
+            // ----- X with CPX ($E0) -----
+            row(
+                "X > M sets C, !Z, !N",
+                0xA2, 0xE0, 'X', 0x42, 0x40, FLAG_CARRY, 0, 0
+            ),
+            row(
+                "X == M sets C and Z, !N",
+                0xA2, 0xE0, 'X', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+            ),
+            row(
+                "X < M clears C/Z, sets N",
+                0xA2, 0xE0, 'X', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+            ),
+            row(
+                "X borrow: 0x00-0x01 → N, !C, !Z",
+                0xA2, 0xE0, 'X', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+            ),
 
-        "A < M clears C and Z, sets N from bit7 of (A-M)" {
-            val (cpu, _, _) = setup(0x40, 0x42)  // diff = 0xFE
-            (cpu.status and FLAG_CARRY) shouldBe 0
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
-        }
+            // ----- Y with CPY ($C0) -----
+            row(
+                "Y > M sets C, !Z, !N",
+                0xA0, 0xC0, 'Y', 0x42, 0x40, FLAG_CARRY, 0, 0
+            ),
+            row(
+                "Y == M sets C and Z, !N",
+                0xA0, 0xC0, 'Y', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+            ),
+            row(
+                "Y < M clears C/Z, sets N",
+                0xA0, 0xC0, 'Y', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+            ),
+            row(
+                "Y borrow: 0x00-0x01 → N, !C, !Z",
+                0xA0, 0xC0, 'Y', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+            ),
+        ) { label, loadOp, cmpOp, reg, regVal, imm, expC, expZ, expN ->
 
-        "Borrow case: 0x00 - 0x01 => 0xFF sets N, clears C and Z" {
-            val (cpu, _, _) = setup(0x00, 0x01)
-            (cpu.status and FLAG_CARRY) shouldBe 0
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            label {
+                val (cpu, _, cycles) = setup(loadOp, regVal, cmpOp, imm)
+
+                // Flags
+                (cpu.status and FLAG_CARRY) shouldBe expC
+                (cpu.status and FLAG_ZERO) shouldBe expZ
+                (cpu.status and FLAG_NEGATIVE) shouldBe expN
+
+                // Register not modified by compare
+                when (reg) {
+                    'A' -> cpu.a shouldBe regVal
+                    'X' -> cpu.x shouldBe regVal
+                    'Y' -> cpu.y shouldBe regVal
+                }
+
+                // 2 (LD*) + 2 (CP*) = 4 cycles
+                cycles shouldBe 4
+            }
         }
     }
 

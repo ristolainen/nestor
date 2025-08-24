@@ -81,12 +81,14 @@ class CPU(
         0xAD -> ldaAbsolute()
         0xAE -> ldxAbsolute()
         0xB0 -> bcs()
-        0xB9 -> ldaAbsoluteM(y)
-        0xBD -> ldaAbsoluteM(x)
+        0xB9 -> ldaAbsoluteY()
+        0xBD -> ldaAbsoluteX()
+        0xC0 -> cpyImmediate()
         0xC9 -> cmpImmediate()
         0xCA -> dex()
         0xD0 -> bne()
         0xD8 -> cld()
+        0xE0 -> cpxImmediate()
         0xEA -> noop()
         0xF0 -> beq()
         else -> unknown(opcode)
@@ -198,7 +200,12 @@ class CPU(
     // Branch if carry set
     private fun bcs() = branchIf(cSet())
 
-    // Load A absolute X or Y
+    // Load A absolute X
+    private fun ldaAbsoluteX() = ldaAbsoluteM(x)
+
+    // Load A absolute Y
+    private fun ldaAbsoluteY() = ldaAbsoluteM(y)
+
     private fun ldaAbsoluteM(m: Int): Int {
         val base = readNextWord()
         val address = (base + m).to16bits()
@@ -208,10 +215,18 @@ class CPU(
     }
 
     // Compare A immediate
-    private fun cmpImmediate() = 2.also {
+    private fun cmpImmediate() = cmImmediate(a)
+
+    // Compare X immediate
+    private fun cpxImmediate() = cmImmediate(x)
+
+    // Compare Y immediate
+    private fun cpyImmediate() = cmImmediate(y)
+
+    private fun cmImmediate(register: Int) = 2.also {
         val v = readNextByte()
-        val diff = (a - v).to8bits()
-        if (a >= v) setStatusFlag(FLAG_CARRY) else clearStatusFlag(FLAG_CARRY)
+        val diff = (register - v).to8bits()
+        if (register >= v) setStatusFlag(FLAG_CARRY) else clearStatusFlag(FLAG_CARRY)
         if (diff == 0) setStatusFlag(FLAG_ZERO) else clearStatusFlag(FLAG_ZERO)
         if ((diff and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
     }
