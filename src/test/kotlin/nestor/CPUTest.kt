@@ -542,6 +542,56 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "DEY instruction" - {
+        "should decrement Y by 1" {
+            val cpu = setupCpuWithInstruction(0x88) // DEX
+            cpu.y = 0x15
+
+            val cycles = cpu.step()
+
+            cpu.y shouldBe 0x14
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should wrap from 0x00 to 0xFF" {
+            val cpu = setupCpuWithInstruction(0x88)
+            cpu.y = 0x00
+
+            val cycles = cpu.step()
+
+            cpu.y shouldBe 0xFF
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 2
+        }
+
+        "should set ZERO when result is 0" {
+            val cpu = setupCpuWithInstruction(0x88)
+            cpu.y = 0x01
+
+            val cycles = cpu.step()
+
+            cpu.y shouldBe 0x00
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should set NEGATIVE when bit 7 is set after decrement" {
+            val cpu = setupCpuWithInstruction(0x88)
+            cpu.y = 0x81  // 0x81 - 1 = 0x80 → negative
+
+            val cycles = cpu.step()
+
+            cpu.y shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 2
+        }
+    }
+
     "JSR absolute" - {
         "pushes (PC-1) and jumps; 6 cycles" {
             // opcode at $8000, operand = $C123

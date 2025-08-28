@@ -69,6 +69,7 @@ class CPU(
         0x84 -> styZeroPage()
         0x85 -> staZeroPage()
         0x86 -> stxZeroPage()
+        0x88 -> dey()
         0x8D -> sdaAbsolute()
         0x90 -> bcc()
         0x91 -> staIndirectY()
@@ -256,6 +257,12 @@ class CPU(
     private fun dex() = 2.also {
         x -= 1
         setZN(x)
+    }
+
+    // Decrement Y
+    private fun dey() = 2.also {
+        y -= 1
+        setZN(y)
     }
 
     // Branch if not equal
