@@ -47,7 +47,7 @@ class CPU(
     fun reset() {
         val lo = memory.read(0xFFFC)
         val hi = memory.read(0xFFFD)
-        pc = word(hi, lo)
+        pc = word(lo, hi)
 
         status = 0x24
     }
@@ -65,11 +65,13 @@ class CPU(
         0x60 -> rts()
         0x70 -> bvs()
         0x78 -> sei()
+        0x81 -> staIndirectX()
         0x84 -> styZeroPage()
         0x85 -> staZeroPage()
         0x86 -> stxZeroPage()
         0x8D -> sdaAbsolute()
         0x90 -> bcc()
+        0x91 -> staIndirectY()
         0x94 -> styZeroPageX()
         0x95 -> staZeroPageX()
         0x96 -> stxZeroPageY()
@@ -116,7 +118,7 @@ class CPU(
     private fun rts() = 6.also {
         val lo = pull()
         val hi = pull()
-        val ret = word(hi, lo)
+        val ret = word(lo, hi)
         pc = ret + 1
     }
 
@@ -159,6 +161,25 @@ class CPU(
 
     // Branch if carry clear
     private fun bcc() = branchIf(!cSet())
+
+    // Store A indirect X
+    private fun staIndirectX() = 6.also {
+        val zp = (readNextByte() + x).to8bits()
+        val lo = memory.read(zp)
+        val hi = memory.read((zp + 1).to8bits())
+        val addr = word(lo, hi)
+        memory.write(addr, a)
+    }
+
+    // Store A indirect Y
+    private fun staIndirectY() = 6.also {
+        val zp = readNextByte()
+        val lo = memory.read(zp)
+        val hi = memory.read((zp + 1).to8bits())
+        val base = word(lo, hi)
+        val addr = (base + y).to16bits()
+        memory.write(addr, a)
+    }
 
     // Transfer X to stack pointer
     private fun txs() = 2.also {
@@ -298,7 +319,7 @@ class CPU(
     private fun readNextWord(): Int {
         val lo = readNextByte()
         val hi = readNextByte()
-        return word(hi, lo)
+        return word(lo, hi)
     }
 
     private fun push(v: Int) {

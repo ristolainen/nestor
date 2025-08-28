@@ -616,4 +616,73 @@ class CPUTest : FreeSpec({
             cpu.memory.read(0x01FD) shouldBe 0xAA
         }
     }
+
+    "STA (indirect),Y and (indirect,X)" - {
+
+        "STA (indirect),Y stores A to (zp + Y) and takes 6 cycles" {
+            val zp = 0x20
+            val cpu = setupCpuWithInstruction(0x91, zp)
+            cpu.a = 0xAB
+            cpu.y = 0x05
+
+            // Zero-page pointer at $0020/$0021 -> base $1234
+            cpu.memory.write(0x0020, 0x34) // low
+            cpu.memory.write(0x0021, 0x12) // high
+
+            val cycles = cpu.step()
+
+            // Effective address = $1234 + Y(5) = $1239
+            cpu.memory.read(0x1239) shouldBe 0xAB
+            cycles shouldBe 6
+        }
+
+        "STA (indirect),Y pointer wrap at $00FF/$0000" {
+            val zp = 0xFF
+            val cpu = setupCpuWithInstruction(0x91, zp)
+            cpu.a = 0x7E
+            cpu.y = 0x01
+
+            // Base pointer uses ZP wrap for high byte: $00FF (lo), $0000 (hi)
+            cpu.memory.write(0x00FF, 0xF0) // low
+            cpu.memory.write(0x0000, 0x10) // high  (wrap from $FF to $00)
+            // Base = $10F0, plus Y(1) -> $10F1
+
+            val cycles = cpu.step()
+
+            cpu.memory.read(0x10F1) shouldBe 0x7E
+            cycles shouldBe 6
+        }
+
+        "STA (indirect,X) uses pointer at (zp + X) & 0xFF; stores to $0205; 6 cycles" {
+            val zp = 0x10
+            val cpu = setupCpuWithInstruction(0x81, zp)
+            cpu.a = 0x55
+            cpu.x = 0x0A
+
+            // (0x10 + 0x0A) & 0xFF = $001A -> pointer bytes = $0205
+            cpu.memory.write(0x001A, 0x05) // low
+            cpu.memory.write(0x001B, 0x02) // high
+
+            val cycles = cpu.step()
+
+            cpu.memory.read(0x0205) shouldBe 0x55
+            cycles shouldBe 6
+        }
+
+        "STA (indirect,X) ZP wrap: (0xFE + 0x05) -> $0003/$0004 -> $0210" {
+            val zp = 0xFE
+            val cpu = setupCpuWithInstruction(0x81, zp)
+            cpu.a = 0x99
+            cpu.x = 0x05
+
+            // Pointer at $0003/$0004 = $0210
+            cpu.memory.write(0x0003, 0x10) // low
+            cpu.memory.write(0x0004, 0x02) // high
+
+            val cycles = cpu.step()
+
+            cpu.memory.read(0x0210) shouldBe 0x99
+            cycles shouldBe 6
+        }
+    }
 })
