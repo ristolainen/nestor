@@ -60,6 +60,8 @@ class CPU(
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
         0x10 -> bpl()
         0x20 -> jsr()
+        0x24 -> bitZeroPage()
+        0x2C -> bitAbsolute()
         0x30 -> bmi()
         0x50 -> bvc()
         0x60 -> rts()
@@ -107,6 +109,24 @@ class CPU(
         push(ret.highByte())
         push(ret.lowByte())
         pc = target
+    }
+
+    // Bit test zero page
+    private fun bitZeroPage() = 3.also {
+        val addr = readNextByte()
+        val m = memory.read(addr)
+        setFlag((a and m) == 0, FLAG_ZERO)
+        setFlag((m and 0x80) != 0, FLAG_NEGATIVE)
+        setFlag((m and 0x40) != 0, FLAG_OVERFLOW)
+    }
+
+    // Bit test absolute
+    private fun bitAbsolute() = 4.also {
+        val addr = readNextWord()
+        val m = memory.read(addr)
+        setFlag((a and m) == 0, FLAG_ZERO)
+        setFlag((m and 0x80) != 0, FLAG_NEGATIVE)
+        setFlag((m and 0x40) != 0, FLAG_OVERFLOW)
     }
 
     // Branch if minus
@@ -248,9 +268,9 @@ class CPU(
     private fun cmImmediate(register: Int) = 2.also {
         val v = readNextByte()
         val diff = (register - v).to8bits()
-        if (register >= v) setStatusFlag(FLAG_CARRY) else clearStatusFlag(FLAG_CARRY)
-        if (diff == 0) setStatusFlag(FLAG_ZERO) else clearStatusFlag(FLAG_ZERO)
-        if ((diff and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
+        setFlag(register >= v, FLAG_CARRY)
+        setFlag(diff == 0, FLAG_ZERO)
+        setFlag((diff and 0x80) != 0, FLAG_NEGATIVE)
     }
 
     // Decrement X
@@ -293,8 +313,24 @@ class CPU(
 
     // Update Zero/Negative for any 8-bit value
     private fun setZN(value: Int) {
-        if ((value and 0xFF) == 0) setStatusFlag(FLAG_ZERO) else clearStatusFlag(FLAG_ZERO)
-        if ((value and 0x80) != 0) setStatusFlag(FLAG_NEGATIVE) else clearStatusFlag(FLAG_NEGATIVE)
+        setZ(value)
+        setN(value)
+    }
+
+    private fun setZ(value: Int) {
+        setFlag((value and 0xFF) == 0, FLAG_ZERO)
+    }
+
+    private fun setN(value: Int) {
+        setFlag((value and 0x80) != 0, FLAG_NEGATIVE)
+    }
+
+    private fun setO(value: Int) {
+        setFlag((value and 0x40) != 0, FLAG_OVERFLOW)
+    }
+
+    private fun setFlag(test: Boolean, flag: Int) {
+        if (test) setStatusFlag(flag) else clearStatusFlag(flag)
     }
 
     private fun setStatusFlag(flag: Int) {

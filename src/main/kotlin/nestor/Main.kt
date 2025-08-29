@@ -25,8 +25,8 @@ fun main() {
     val emulation = Emulation(cpu, ppu, memoryBus)
     emulation.runAFewTicks()
 
-    //ppu.renderFrame()
-    //screen.draw(ppu.currentFrame())
+    ppu.renderFrame()
+    screen.draw(ppu.currentFrame())
 }
 
 private fun displayScreen(screen: ScreenRenderer) {

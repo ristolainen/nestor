@@ -735,4 +735,42 @@ class CPUTest : FreeSpec({
             cycles shouldBe 6
         }
     }
+
+    "BIT absolute" - {
+
+        fun setup(aVal: Int, memVal: Int): Triple<CPU, Int, Int> {
+            // Program: LDA #aVal ; BIT $1234
+            val cpu = setupCpuWithInstruction(0xA9, aVal, 0x2C, 0x34, 0x12)
+            cpu.memory.write(0x1234, memVal)
+            val cycles = cpu.step() + cpu.step()
+            return Triple(cpu, memVal, cycles)
+        }
+
+        "sets Z when (A & M) == 0" {
+            val (cpu, _, cycles) = setup(0x0F, 0xF0) // 0x0F & 0xF0 == 0
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            cycles shouldBe 2 /* LDA #imm */ + 4 /* BIT abs */
+        }
+
+        "clears Z when (A & M) != 0" {
+            val (cpu, _, _) = setup(0x0F, 0x0F)
+            (cpu.status and FLAG_ZERO) shouldBe 0
+        }
+
+        "copies bit 7 of M into N" {
+            val (cpu1, _, _) = setup(0xFF, 0b1000_0000)
+            (cpu1.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+
+            val (cpu2, _, _) = setup(0xFF, 0b0111_1111)
+            (cpu2.status and FLAG_NEGATIVE) shouldBe 0
+        }
+
+        "copies bit 6 of M into V" {
+            val (cpu1, _, _) = setup(0xFF, 0b0100_0000)
+            (cpu1.status and FLAG_OVERFLOW) shouldBe FLAG_OVERFLOW
+
+            val (cpu2, _, _) = setup(0xFF, 0b1011_1111)
+            (cpu2.status and FLAG_OVERFLOW) shouldBe 0
+        }
+    }
 })
