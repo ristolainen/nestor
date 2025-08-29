@@ -492,103 +492,54 @@ class CPUTest : FreeSpec({
         }
     }
 
-    "DEX instruction" - {
-        "should decrement X by 1" {
-            val cpu = setupCpuWithInstruction(0xCA) // DEX
-            cpu.x = 0x05
-
-            val cycles = cpu.step()
-
-            cpu.x shouldBe 0x04
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-            cycles shouldBe 2
+    "Increment and decrement X and Y" - {
+        fun setReg(cpu: CPU, reg: Char, v: Int) {
+            when (reg) {
+                'X' -> cpu.x = v
+                'Y' -> cpu.y = v
+                else -> error("reg must be 'X' or 'Y'")
+            }
         }
 
-        "should wrap from 0x00 to 0xFF" {
-            val cpu = setupCpuWithInstruction(0xCA)
-            cpu.x = 0x00
+        fun getReg(cpu: CPU, reg: Char): Int =
+            when (reg) {
+                'X' -> cpu.x
+                'Y' -> cpu.y
+                else -> error("reg must be 'X' or 'Y'")
+            }
 
-            val cycles = cpu.step()
+        "DEX/DEY/INX/INY behave correctly (wrap + Z/N flags)" {
+            forAll(
+                // label, opcode, reg, start, expected, expectZ, expectN
+                row("DEX: dec 0x05 -> 0x04",         0xCA, 'X', 0x05, 0x04, 0,               0),
+                row("DEX: wrap 0x00 -> 0xFF",        0xCA, 'X', 0x00, 0xFF, 0,               FLAG_NEGATIVE),
+                row("DEX: 0x01 -> 0x00 sets Z",      0xCA, 'X', 0x01, 0x00, FLAG_ZERO,       0),
+                row("DEX: 0x81 -> 0x80 sets N",      0xCA, 'X', 0x81, 0x80, 0,               FLAG_NEGATIVE),
 
-            cpu.x shouldBe 0xFF
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
-            cycles shouldBe 2
-        }
+                row("DEY: dec 0x15 -> 0x14",         0x88, 'Y', 0x15, 0x14, 0,               0),
+                row("DEY: wrap 0x00 -> 0xFF",        0x88, 'Y', 0x00, 0xFF, 0,               FLAG_NEGATIVE),
+                row("DEY: 0x01 -> 0x00 sets Z",      0x88, 'Y', 0x01, 0x00, FLAG_ZERO,       0),
+                row("DEY: 0x81 -> 0x80 sets N",      0x88, 'Y', 0x81, 0x80, 0,               FLAG_NEGATIVE),
 
-        "should set ZERO when result is 0" {
-            val cpu = setupCpuWithInstruction(0xCA)
-            cpu.x = 0x01
+                row("INX: inc 0x05 -> 0x06",         0xE8, 'X', 0x05, 0x06, 0,               0),
+                row("INX: wrap 0xFF -> 0x00 sets Z", 0xE8, 'X', 0xFF, 0x00, FLAG_ZERO,       0),
+                row("INX: 0x7F -> 0x80 sets N",      0xE8, 'X', 0x7F, 0x80, 0,               FLAG_NEGATIVE),
 
-            val cycles = cpu.step()
+                row("INY: inc 0x05 -> 0x06",         0xC8, 'Y', 0x05, 0x06, 0,               0),
+                row("INY: wrap 0xFF -> 0x00 sets Z", 0xC8, 'Y', 0xFF, 0x00, FLAG_ZERO,       0),
+                row("INY: 0x7F -> 0x80 sets N",      0xC8, 'Y', 0x7F, 0x80, 0,               FLAG_NEGATIVE),
+            ) { label, opcode, reg, start, expected, expectZ, expectN ->
+                val cpu = setupCpuWithInstruction(opcode)
+                cpu.status = 0 // start clean
+                setReg(cpu, reg, start)
 
-            cpu.x shouldBe 0x00
-            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-            cycles shouldBe 2
-        }
+                val cycles = cpu.step()
 
-        "should set NEGATIVE when bit 7 is set after decrement" {
-            val cpu = setupCpuWithInstruction(0xCA)
-            cpu.x = 0x81  // 0x81 - 1 = 0x80 → negative
-
-            val cycles = cpu.step()
-
-            cpu.x shouldBe 0x80
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
-            cycles shouldBe 2
-        }
-    }
-
-    "DEY instruction" - {
-        "should decrement Y by 1" {
-            val cpu = setupCpuWithInstruction(0x88) // DEX
-            cpu.y = 0x15
-
-            val cycles = cpu.step()
-
-            cpu.y shouldBe 0x14
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-            cycles shouldBe 2
-        }
-
-        "should wrap from 0x00 to 0xFF" {
-            val cpu = setupCpuWithInstruction(0x88)
-            cpu.y = 0x00
-
-            val cycles = cpu.step()
-
-            cpu.y shouldBe 0xFF
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
-            cycles shouldBe 2
-        }
-
-        "should set ZERO when result is 0" {
-            val cpu = setupCpuWithInstruction(0x88)
-            cpu.y = 0x01
-
-            val cycles = cpu.step()
-
-            cpu.y shouldBe 0x00
-            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
-            (cpu.status and FLAG_NEGATIVE) shouldBe 0
-            cycles shouldBe 2
-        }
-
-        "should set NEGATIVE when bit 7 is set after decrement" {
-            val cpu = setupCpuWithInstruction(0x88)
-            cpu.y = 0x81  // 0x81 - 1 = 0x80 → negative
-
-            val cycles = cpu.step()
-
-            cpu.y shouldBe 0x80
-            (cpu.status and FLAG_ZERO) shouldBe 0
-            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
-            cycles shouldBe 2
+                getReg(cpu, reg) shouldBe expected
+                (cpu.status and FLAG_ZERO) shouldBe expectZ
+                (cpu.status and FLAG_NEGATIVE) shouldBe expectN
+                cycles shouldBe 2
+            }
         }
     }
 

@@ -91,11 +91,13 @@ class CPU(
         0xB9 -> ldaAbsoluteY()
         0xBD -> ldaAbsoluteX()
         0xC0 -> cpyImmediate()
+        0xC8 -> iny()
         0xC9 -> cmpImmediate()
         0xCA -> dex()
         0xD0 -> bne()
         0xD8 -> cld()
         0xE0 -> cpxImmediate()
+        0xE8 -> inx()
         0xEA -> noop()
         0xF0 -> beq()
         else -> unknown(opcode)
@@ -294,6 +296,18 @@ class CPU(
     // Decrement Y
     private fun dey() = 2.also {
         y -= 1
+        setZN(y)
+    }
+
+    // Increment X
+    private fun inx() = 2.also {
+        x += 1
+        setZN(x)
+    }
+
+    // Increment Y
+    private fun iny() = 2.also {
+        y += 1
         setZN(y)
     }
 
