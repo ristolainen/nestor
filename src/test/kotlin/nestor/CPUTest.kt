@@ -773,4 +773,44 @@ class CPUTest : FreeSpec({
             (cpu2.status and FLAG_OVERFLOW) shouldBe 0
         }
     }
+
+    "STA absolute indexed (X/Y)" - {
+
+        data class Case(
+            val label: String,
+            val opcode: Int,        // 0x9D = STA abs,X, 0x99 = STA abs,Y
+            val indexReg: Char,     // 'X' or 'Y'
+            val lo: Int,
+            val hi: Int,
+            val indexVal: Int,
+            val aVal: Int
+        )
+
+        suspend fun runCase(c: Case) {
+            c.label {
+                // Program: LDA #aVal ; STA $hi$lo,index
+                val cpu = setupCpuWithInstruction(0xA9, c.aVal, c.opcode, c.lo, c.hi)
+                if (c.indexReg == 'X') cpu.x = c.indexVal else cpu.y = c.indexVal
+
+                val cycles = cpu.step() + cpu.step()
+
+                val base = (c.hi shl 8) or c.lo
+                val eff  = (base + c.indexVal) and 0xFFFF
+
+                cpu.memory.read(eff) shouldBe c.aVal
+                // LDA #imm = 2 cycles, STA abs,indexed = 5 cycles (no extra on page cross for stores)
+                cycles shouldBe 7
+            }
+        }
+
+        io.kotest.data.forAll(
+            // -------- abs,X ----------
+            row(Case("abs,X no page cross", 0x9D, 'X', 0x10, 0x10, 0x05, 0x3C)), // $1010 + 5 -> $2015
+            row(Case("abs,X page cross",    0x9D, 'X', 0xFF, 0x10, 0x02, 0x7E)), // $10FF + 2 -> $2101
+
+            // -------- abs,Y ----------
+            row(Case("abs,Y no page cross", 0x99, 'Y', 0x10, 0x10, 0x05, 0x55)), // $1010 + 5 -> $1015
+            row(Case("abs,Y page cross",    0x99, 'Y', 0xFF, 0x10, 0x02, 0xAA)), // $10FF + 2 -> $1101
+        ) { c -> runCase(c) }
+    }
 })

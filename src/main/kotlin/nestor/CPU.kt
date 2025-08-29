@@ -78,7 +78,9 @@ class CPU(
         0x94 -> styZeroPageX()
         0x95 -> staZeroPageX()
         0x96 -> stxZeroPageY()
+        0x99 -> staAbsoluteY()
         0x9A -> txs()
+        0x9D -> staAbsoluteX()
         0xA0 -> ldyImmediate()
         0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
@@ -113,16 +115,15 @@ class CPU(
 
     // Bit test zero page
     private fun bitZeroPage() = 3.also {
-        val addr = readNextByte()
-        val m = memory.read(addr)
-        setFlag((a and m) == 0, FLAG_ZERO)
-        setFlag((m and 0x80) != 0, FLAG_NEGATIVE)
-        setFlag((m and 0x40) != 0, FLAG_OVERFLOW)
+        bitTest(readNextByte())
     }
 
     // Bit test absolute
     private fun bitAbsolute() = 4.also {
-        val addr = readNextWord()
+        bitTest(readNextWord())
+    }
+
+    private fun bitTest(addr: Int) {
         val m = memory.read(addr)
         setFlag((a and m) == 0, FLAG_ZERO)
         setFlag((m and 0x80) != 0, FLAG_NEGATIVE)
@@ -163,6 +164,17 @@ class CPU(
     // Store X with Y zero page addressing
     private fun stxZeroPageY() = 4.also { stZeroPage(x, y) }
 
+    // Store A absolute X
+    private fun staAbsoluteX() = staAbsoluteI(x)
+
+    // Store A absolute Y
+    private fun staAbsoluteY() = staAbsoluteI(y)
+
+    private fun staAbsoluteI(i: Int) = 5.also {
+        val addr = (readNextWord() + i).to16bits()
+        memory.write(addr, a)
+    }
+
     // Store Y zero page addressing
     private fun styZeroPage() = 3.also { stZeroPage(y, 0) }
 
@@ -170,14 +182,14 @@ class CPU(
     private fun styZeroPageX() = 4.also { stZeroPage(y, x) }
 
     private fun stZeroPage(v: Int, o: Int) {
-        val address = (readNextByte() + o).to8bits()
-        memory.write(address, v)
+        val addr = (readNextByte() + o).to8bits()
+        memory.write(addr, v)
     }
 
     // Store accumulator absolute addressing
     private fun sdaAbsolute() = 4.also {
-        val address = readNextWord()
-        memory.write(address, a)
+        val addr = readNextWord()
+        memory.write(addr, a)
     }
 
     // Branch if carry clear
@@ -243,14 +255,14 @@ class CPU(
     private fun bcs() = branchIf(cSet())
 
     // Load A absolute X
-    private fun ldaAbsoluteX() = ldaAbsoluteM(x)
+    private fun ldaAbsoluteX() = ldaAbsoluteI(x)
 
     // Load A absolute Y
-    private fun ldaAbsoluteY() = ldaAbsoluteM(y)
+    private fun ldaAbsoluteY() = ldaAbsoluteI(y)
 
-    private fun ldaAbsoluteM(m: Int): Int {
+    private fun ldaAbsoluteI(i: Int): Int {
         val base = readNextWord()
-        val address = (base + m).to16bits()
+        val address = (base + i).to16bits()
         a = memory.read(address)
         setZN(a)
         return 4 + crossPageCycles(base, address)
@@ -265,10 +277,10 @@ class CPU(
     // Compare Y immediate
     private fun cpyImmediate() = cmImmediate(y)
 
-    private fun cmImmediate(register: Int) = 2.also {
+    private fun cmImmediate(reg: Int) = 2.also {
         val v = readNextByte()
-        val diff = (register - v).to8bits()
-        setFlag(register >= v, FLAG_CARRY)
+        val diff = (reg - v).to8bits()
+        setFlag(reg >= v, FLAG_CARRY)
         setFlag(diff == 0, FLAG_ZERO)
         setFlag((diff and 0x80) != 0, FLAG_NEGATIVE)
     }
@@ -290,8 +302,8 @@ class CPU(
 
     // Load Y absolute
     private fun ldyAbsolute() = 4.also {
-        val address = readNextWord()
-        y = memory.read(address)
+        val addr = readNextWord()
+        y = memory.read(addr)
         setZN(y)
     }
 
