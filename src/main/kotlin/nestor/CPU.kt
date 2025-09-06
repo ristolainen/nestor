@@ -58,7 +58,15 @@ class CPU(
     }
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
+        0x01 -> oraIndirectX()
+        0x05 -> oraZeroPage()
+        0x09 -> oraImmediate()
+        0x0D -> oraAbsolute()
         0x10 -> bpl()
+        0x11 -> oraIndirectY()
+        0x15 -> oraZeroPageX()
+        0x19 -> oraAbsoluteY()
+        0x1D -> oraAbsoluteX()
         0x20 -> jsr()
         0x24 -> bitZeroPage()
         0x2C -> bitAbsolute()
@@ -102,6 +110,79 @@ class CPU(
         0xF0 -> beq()
         else -> unknown(opcode)
     }.also { cycles += it }
+
+    // Bitwise OR immediate
+    private fun oraImmediate() = 2.also {
+        val v = readNextByte()
+        a = a or v
+        setZN(a)
+    }
+
+    // Bitwise OR zero page
+    private fun oraZeroPage() = 3.also {
+        val addr = readNextByte()
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+    }
+
+    // Bitwise OR zero page X
+    private fun oraZeroPageX() = 4.also {
+        val base = readNextByte()
+        val addr = (base + x).to8bits()
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+    }
+
+    // Bitwise OR absolute
+    private fun oraAbsolute() = 4.also {
+        val addr = readNextWord()
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+    }
+
+    // Bitwise OR absolute X
+    private fun oraAbsoluteX() = oraAbsoluteI(x)
+
+    // Bitwise OR absolute Y
+    private fun oraAbsoluteY() = oraAbsoluteI(y)
+
+    // Bitwise OR absolute indexes
+    private fun oraAbsoluteI(i: Int): Int {
+        val base = readNextWord()
+        val addr = (base + i).to16bits()
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+        return 4 + crossPageCycles(base, addr)
+    }
+
+    // Bitwise OR indirect X
+    private fun oraIndirectX() = 6.also {
+        val base = readNextByte()
+        val zpAddr = (base + x).to8bits()
+        val lo = memory.read(zpAddr)
+        val hi = memory.read((zpAddr + 1).to8bits())
+        val addr = word(lo, hi)
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+    }
+
+    // Bitwise OR indirect Y
+    private fun oraIndirectY(): Int {
+        val zpAddr = readNextByte()
+        val lo = memory.read(zpAddr)
+        val hi = memory.read((zpAddr + 1).to8bits())
+        val base = word(lo, hi)
+        val addr = (base + y).to16bits()
+        val v = memory.read(addr)
+        a = a or v
+        setZN(a)
+        return 5 + crossPageCycles(base, addr)
+    }
 
     // Branch if plus
     private fun bpl() = branchIf(!nSet())

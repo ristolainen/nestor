@@ -511,23 +511,23 @@ class CPUTest : FreeSpec({
         "DEX/DEY/INX/INY behave correctly (wrap + Z/N flags)" {
             forAll(
                 // label, opcode, reg, start, expected, expectZ, expectN
-                row("DEX: dec 0x05 -> 0x04",         0xCA, 'X', 0x05, 0x04, 0,               0),
-                row("DEX: wrap 0x00 -> 0xFF",        0xCA, 'X', 0x00, 0xFF, 0,               FLAG_NEGATIVE),
-                row("DEX: 0x01 -> 0x00 sets Z",      0xCA, 'X', 0x01, 0x00, FLAG_ZERO,       0),
-                row("DEX: 0x81 -> 0x80 sets N",      0xCA, 'X', 0x81, 0x80, 0,               FLAG_NEGATIVE),
+                row("DEX: dec 0x05 -> 0x04", 0xCA, 'X', 0x05, 0x04, 0, 0),
+                row("DEX: wrap 0x00 -> 0xFF", 0xCA, 'X', 0x00, 0xFF, 0, FLAG_NEGATIVE),
+                row("DEX: 0x01 -> 0x00 sets Z", 0xCA, 'X', 0x01, 0x00, FLAG_ZERO, 0),
+                row("DEX: 0x81 -> 0x80 sets N", 0xCA, 'X', 0x81, 0x80, 0, FLAG_NEGATIVE),
 
-                row("DEY: dec 0x15 -> 0x14",         0x88, 'Y', 0x15, 0x14, 0,               0),
-                row("DEY: wrap 0x00 -> 0xFF",        0x88, 'Y', 0x00, 0xFF, 0,               FLAG_NEGATIVE),
-                row("DEY: 0x01 -> 0x00 sets Z",      0x88, 'Y', 0x01, 0x00, FLAG_ZERO,       0),
-                row("DEY: 0x81 -> 0x80 sets N",      0x88, 'Y', 0x81, 0x80, 0,               FLAG_NEGATIVE),
+                row("DEY: dec 0x15 -> 0x14", 0x88, 'Y', 0x15, 0x14, 0, 0),
+                row("DEY: wrap 0x00 -> 0xFF", 0x88, 'Y', 0x00, 0xFF, 0, FLAG_NEGATIVE),
+                row("DEY: 0x01 -> 0x00 sets Z", 0x88, 'Y', 0x01, 0x00, FLAG_ZERO, 0),
+                row("DEY: 0x81 -> 0x80 sets N", 0x88, 'Y', 0x81, 0x80, 0, FLAG_NEGATIVE),
 
-                row("INX: inc 0x05 -> 0x06",         0xE8, 'X', 0x05, 0x06, 0,               0),
-                row("INX: wrap 0xFF -> 0x00 sets Z", 0xE8, 'X', 0xFF, 0x00, FLAG_ZERO,       0),
-                row("INX: 0x7F -> 0x80 sets N",      0xE8, 'X', 0x7F, 0x80, 0,               FLAG_NEGATIVE),
+                row("INX: inc 0x05 -> 0x06", 0xE8, 'X', 0x05, 0x06, 0, 0),
+                row("INX: wrap 0xFF -> 0x00 sets Z", 0xE8, 'X', 0xFF, 0x00, FLAG_ZERO, 0),
+                row("INX: 0x7F -> 0x80 sets N", 0xE8, 'X', 0x7F, 0x80, 0, FLAG_NEGATIVE),
 
-                row("INY: inc 0x05 -> 0x06",         0xC8, 'Y', 0x05, 0x06, 0,               0),
-                row("INY: wrap 0xFF -> 0x00 sets Z", 0xC8, 'Y', 0xFF, 0x00, FLAG_ZERO,       0),
-                row("INY: 0x7F -> 0x80 sets N",      0xC8, 'Y', 0x7F, 0x80, 0,               FLAG_NEGATIVE),
+                row("INY: inc 0x05 -> 0x06", 0xC8, 'Y', 0x05, 0x06, 0, 0),
+                row("INY: wrap 0xFF -> 0x00 sets Z", 0xC8, 'Y', 0xFF, 0x00, FLAG_ZERO, 0),
+                row("INY: 0x7F -> 0x80 sets N", 0xC8, 'Y', 0x7F, 0x80, 0, FLAG_NEGATIVE),
             ) { label, opcode, reg, start, expected, expectZ, expectN ->
                 val cpu = setupCpuWithInstruction(opcode)
                 cpu.status = 0 // start clean
@@ -746,7 +746,7 @@ class CPUTest : FreeSpec({
                 val cycles = cpu.step() + cpu.step()
 
                 val base = (c.hi shl 8) or c.lo
-                val eff  = (base + c.indexVal) and 0xFFFF
+                val eff = (base + c.indexVal) and 0xFFFF
 
                 cpu.memory.read(eff) shouldBe c.aVal
                 // LDA #imm = 2 cycles, STA abs,indexed = 5 cycles (no extra on page cross for stores)
@@ -757,11 +757,158 @@ class CPUTest : FreeSpec({
         io.kotest.data.forAll(
             // -------- abs,X ----------
             row(Case("abs,X no page cross", 0x9D, 'X', 0x10, 0x10, 0x05, 0x3C)), // $1010 + 5 -> $2015
-            row(Case("abs,X page cross",    0x9D, 'X', 0xFF, 0x10, 0x02, 0x7E)), // $10FF + 2 -> $2101
+            row(Case("abs,X page cross", 0x9D, 'X', 0xFF, 0x10, 0x02, 0x7E)), // $10FF + 2 -> $2101
 
             // -------- abs,Y ----------
             row(Case("abs,Y no page cross", 0x99, 'Y', 0x10, 0x10, 0x05, 0x55)), // $1010 + 5 -> $1015
-            row(Case("abs,Y page cross",    0x99, 'Y', 0xFF, 0x10, 0x02, 0xAA)), // $10FF + 2 -> $1101
+            row(Case("abs,Y page cross", 0x99, 'Y', 0xFF, 0x10, 0x02, 0xAA)), // $10FF + 2 -> $1101
         ) { c -> runCase(c) }
+    }
+
+    "ORA instruction" - {
+
+        // Utility: write a value into CPU memory via the MemoryBus
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        // 1) Result/flags across all addressing modes (no page cross)
+        "should OR A with memory/immediate and set Z/N; correct base cycles" - {
+            // Each row sets up: initial A, opcode stream, memory writes, and expected (A, Z, N, cycles)
+            io.kotest.data.forAll(
+                // label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles
+                row(
+                    "Immediate ($09)", intArrayOf(0x09, 0b0000_1010),
+                    { cpu: CPU -> cpu.a = 0b0011_0000 },
+                    0b0011_1010, 0, 0, 2
+                ),
+                row(
+                    "Zero Page ($05)", intArrayOf(0x05, 0x10),
+                    { cpu: CPU ->
+                        cpu.a = 0b0100_0000
+                        write(cpu, 0x0010, 0b0000_1111)
+                    },
+                    0b0100_1111, 0, 0, 3
+                ),
+                row(
+                    "Zero Page,X ($15)", intArrayOf(0x15, 0x80),
+                    { cpu: CPU ->
+                        cpu.a = 0b0000_0000
+                        cpu.x = 0x05
+                        write(cpu, 0x0085, 0b1000_0000) // (0x80 + X) & 0xFF
+                    },
+                    0b1000_0000, 0, FLAG_NEGATIVE, 4
+                ),
+                row(
+                    "Absolute ($0D)", intArrayOf(0x0D, 0x34, 0x20), // $2034
+                    { cpu: CPU ->
+                        cpu.a = 0b0000_0011
+                        write(cpu, 0x2034, 0b0000_0000)
+                    },
+                    0b0000_0011, 0, 0, 4
+                ),
+                row(
+                    "Absolute,X no cross ($1D)", intArrayOf(0x1D, 0xF0, 0x00), // base $20F0
+                    { cpu: CPU ->
+                        cpu.a = 0b0000_0011
+                        cpu.x = 0x0E // eff $00FE (no cross)
+                        write(cpu, 0x00FE, 0b1111_0000)
+                    },
+                    0b1111_0011, 0, FLAG_NEGATIVE, 4
+                ),
+                row(
+                    "Absolute,Y no cross ($19)", intArrayOf(0x19, 0xF0, 0x00), // base $20F0
+                    { cpu: CPU ->
+                        cpu.a = 0
+                        cpu.y = 0x0E // eff $00FE
+                        write(cpu, 0x00FE, 0b0000_0000)
+                    },
+                    0, FLAG_ZERO, 0, 4
+                ),
+                row(
+                    "(Indirect,X) ($01)", intArrayOf(0x01, 0x10),
+                    { cpu: CPU ->
+                        cpu.a = 0b0000_0101
+                        cpu.x = 0x04
+                        // zp idx = (0x10 + X) & 0xFF = 0x14 → pointer @ $0014/$0015
+                        write(cpu, 0x0014, 0x78) // lo
+                        write(cpu, 0x0015, 0x10) // hi → eff $1078
+                        write(cpu, 0x1078, 0b1000_0000)
+                    },
+                    0b1000_0101, 0, FLAG_NEGATIVE, 6
+                ),
+                row(
+                    "(Indirect),Y no cross ($11)", intArrayOf(0x11, 0x20),
+                    { cpu: CPU ->
+                        cpu.a = 0xFF
+                        cpu.y = 0x00
+                        // pointer @ $0020/$0021 = $0100; Y=0 → eff $0100 (CPU RAM)
+                        write(cpu, 0x0020, 0x00) // lo
+                        write(cpu, 0x0021, 0x01) // hi
+                        write(cpu, 0x0100, 0x00)
+                    },
+                    0xFF, 0, FLAG_NEGATIVE, 5
+                ),
+            ) { label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles ->
+                label {
+                    val cpu = setupCpuWithInstruction(*bytes)
+                    setup(cpu)
+
+                    val cycles = cpu.step()
+
+                    cpu.a shouldBe expectedA
+                    (cpu.status and FLAG_ZERO) shouldBe expectedZ
+                    (cpu.status and FLAG_NEGATIVE) shouldBe expectedN
+                    cycles shouldBe expectedCycles
+                }
+            }
+        }
+
+        "should add +1 cycle on page cross for Absolute,X and Absolute,Y" {
+            // Absolute,X cross: base $00FF + X=0x05 -> $0104
+            run {
+                val cpu = setupCpuWithInstruction(0xBD, 0xFF, 0x00) // LDA abs,X
+                cpu.a = 0
+                cpu.x = 0x05
+                write(cpu, 0x0104, 0x01)
+
+                val cycles = cpu.step()
+
+                cpu.a shouldBe 0x01
+                (cpu.status and FLAG_ZERO) shouldBe 0
+                (cpu.status and FLAG_NEGATIVE) shouldBe 0
+                cycles shouldBe 5
+            }
+            // Absolute,Y cross: base $00FE + Y=0x02 -> $0100
+            run {
+                val cpu = setupCpuWithInstruction(0xB9, 0xFE, 0x00) // LDA abs,Y
+                cpu.a = 0
+                cpu.y = 0x02
+                write(cpu, 0x0100, 0x80)
+
+                val cycles = cpu.step()
+
+                cpu.a shouldBe 0x80
+                (cpu.status and FLAG_ZERO) shouldBe 0
+                (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+                cycles shouldBe 5
+            }
+        }
+
+        // 3) Page-cross penalty for (Indirect),Y
+        "(Indirect),Y should add +1 cycle on page cross" {
+            // Pointer at $0040/$0041 = $00FF; Y=+2 → eff $0101 (crosses $00xx → $01xx)
+            val cpu = setupCpuWithInstruction(0x11, 0x40)
+            cpu.a = 0
+            cpu.y = 0x02
+            write(cpu, 0x0040, 0xFF) // lo
+            write(cpu, 0x0041, 0x00) // hi  → base = $00FF
+            write(cpu, 0x0101, 0x7F) // effective addr after Y
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x7F
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 6
+        }
     }
 })
