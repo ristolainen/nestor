@@ -68,9 +68,17 @@ class CPU(
         0x19 -> oraAbsoluteY()
         0x1D -> oraAbsoluteX()
         0x20 -> jsr()
+        0x21 -> andIndirectX()
         0x24 -> bitZeroPage()
+        0x25 -> andZeroPage()
+        0x29 -> andImmediate()
         0x2C -> bitAbsolute()
+        0x2D -> andAbsolute()
         0x30 -> bmi()
+        0x31 -> andIndirectY()
+        0x35 -> andZeroPageX()
+        0x39 -> andAbsoluteY()
+        0x3D -> andAbsoluteX()
         0x50 -> bvc()
         0x60 -> rts()
         0x70 -> bvs()
@@ -180,6 +188,79 @@ class CPU(
         val addr = (base + y).to16bits()
         val v = memory.read(addr)
         a = a or v
+        setZN(a)
+        return 5 + crossPageCycles(base, addr)
+    }
+
+    // Bitwise AND immediate
+    private fun andImmediate() = 2.also {
+        val v = readNextByte()
+        a = a and v
+        setZN(a)
+    }
+
+    // Bitwise AND zero page
+    private fun andZeroPage() = 3.also {
+        val addr = readNextByte()
+        val v = memory.read(addr)
+        a = a and v
+        setZN(a)
+    }
+
+    // Bitwise AND zero page X
+    private fun andZeroPageX() = 4.also {
+        val base = readNextByte()
+        val addr = (base + x).to8bits()
+        val v = memory.read(addr)
+        a = a and v
+        setZN(a)
+    }
+
+    // Bitwise AND absolute
+    private fun andAbsolute() = 4.also {
+        val addr = readNextWord()
+        val v = memory.read(addr)
+        a = a and v
+        setZN(a)
+    }
+
+    // Bitwise AND absolute X
+    private fun andAbsoluteX() = andAbsoluteI(x)
+
+    // Bitwise AND absolute Y
+    private fun andAbsoluteY() = andAbsoluteI(y)
+
+    // Bitwise OR absolute indexes
+    private fun andAbsoluteI(i: Int): Int {
+        val base = readNextWord()
+        val addr = (base + i).to16bits()
+        val v = memory.read(addr)
+        a = a and v
+        setZN(a)
+        return 4 + crossPageCycles(base, addr)
+    }
+
+    // Bitwise AND indirect X
+    private fun andIndirectX() = 6.also {
+        val base = readNextByte()
+        val zpAddr = (base + x).to8bits()
+        val lo = memory.read(zpAddr)
+        val hi = memory.read((zpAddr + 1).to8bits())
+        val addr = word(lo, hi)
+        val v = memory.read(addr)
+        a = a and v
+        setZN(a)
+    }
+
+    // Bitwise AND indirect Y
+    private fun andIndirectY(): Int {
+        val zpAddr = readNextByte()
+        val lo = memory.read(zpAddr)
+        val hi = memory.read((zpAddr + 1).to8bits())
+        val base = word(lo, hi)
+        val addr = (base + y).to16bits()
+        val v = memory.read(addr)
+        a = a and v
         setZN(a)
         return 5 + crossPageCycles(base, addr)
     }

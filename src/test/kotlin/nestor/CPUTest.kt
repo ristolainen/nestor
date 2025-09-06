@@ -911,4 +911,152 @@ class CPUTest : FreeSpec({
             cycles shouldBe 6
         }
     }
+
+    "AND instruction" - {
+
+        // Utility: write a value into CPU memory via the MemoryBus
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        // 1) Result/flags across all addressing modes (no page cross)
+        "should AND A with memory/immediate and set Z/N; correct base cycles" - {
+            io.kotest.data.forAll(
+                // label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles
+
+                row(
+                    "Immediate ($29)", intArrayOf(0x29, 0b0000_1111),
+                    { cpu: CPU -> cpu.a = 0b0011_1010 },
+                    0b0000_1010, 0, 0, 2
+                ),
+                row(
+                    "Zero Page ($25)", intArrayOf(0x25, 0x10),
+                    { cpu: CPU ->
+                        cpu.a = 0b0011_0011
+                        write(cpu, 0x0010, 0b1111_0000)
+                    },
+                    0b0011_0000, 0, 0, 3
+                ),
+                row(
+                    "Zero Page,X ($35)", intArrayOf(0x35, 0x80),
+                    { cpu: CPU ->
+                        cpu.a = 0xFF
+                        cpu.x = 0x05
+                        write(cpu, 0x0085, 0b1000_0000) // (0x80 + X) & 0xFF
+                    },
+                    0b1000_0000, 0, FLAG_NEGATIVE, 4
+                ),
+                row(
+                    "Absolute ($2D)", intArrayOf(0x2D, 0x34, 0x20), // $2034
+                    { cpu: CPU ->
+                        cpu.a = 0b0000_0011
+                        write(cpu, 0x2034, 0b0000_0000)
+                    },
+                    0b0000_0000, FLAG_ZERO, 0, 4
+                ),
+                row(
+                    "Absolute,X no cross ($3D)", intArrayOf(0x3D, 0xF0, 0x00), // base $00F0
+                    { cpu: CPU ->
+                        cpu.a = 0b1111_0011
+                        cpu.x = 0x0E // eff $00FE (no cross)
+                        write(cpu, 0x00FE, 0b1111_0000)
+                    },
+                    0b1111_0000, 0, FLAG_NEGATIVE, 4
+                ),
+                row(
+                    "Absolute,Y no cross ($39)", intArrayOf(0x39, 0xF0, 0x00), // base $00F0
+                    { cpu: CPU ->
+                        cpu.a = 0xFF
+                        cpu.y = 0x0E // eff $00FE
+                        write(cpu, 0x00FE, 0x00)
+                    },
+                    0x00, FLAG_ZERO, 0, 4
+                ),
+                row(
+                    "(Indirect,X) ($21)", intArrayOf(0x21, 0x10),
+                    { cpu: CPU ->
+                        cpu.a = 0xFF
+                        cpu.x = 0x04
+                        // zp idx = (0x10 + X) & 0xFF = 0x14 → pointer @ $0014/$0015
+                        write(cpu, 0x0014, 0x78) // lo
+                        write(cpu, 0x0015, 0x10) // hi → eff $1078
+                        write(cpu, 0x1078, 0b1000_0000)
+                    },
+                    0b1000_0000, 0, FLAG_NEGATIVE, 6
+                ),
+                row(
+                    "(Indirect),Y no cross ($31)", intArrayOf(0x31, 0x20),
+                    { cpu: CPU ->
+                        cpu.a = 0xFF
+                        cpu.y = 0x00
+                        // pointer @ $0020/$0021 = $0100; Y=0 → eff $0100
+                        write(cpu, 0x0020, 0x00) // lo
+                        write(cpu, 0x0021, 0x01) // hi
+                        write(cpu, 0x0100, 0x7F)
+                    },
+                    0x7F, 0, 0, 5
+                ),
+            ) { label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles ->
+                label {
+                    val cpu = setupCpuWithInstruction(*bytes)
+                    setup(cpu)
+
+                    val cycles = cpu.step()
+
+                    cpu.a shouldBe expectedA
+                    (cpu.status and FLAG_ZERO) shouldBe expectedZ
+                    (cpu.status and FLAG_NEGATIVE) shouldBe expectedN
+                    cycles shouldBe expectedCycles
+                }
+            }
+        }
+
+        // 2) Page-cross penalties for Absolute,X and Absolute,Y (AND should incur +1 on cross)
+        "should add +1 cycle on page cross for Absolute,X and Absolute,Y" {
+            // Absolute,X cross: base $00FF + X=0x05 -> $0104
+            run {
+                val cpu = setupCpuWithInstruction(0x3D, 0xFF, 0x00) // AND abs,X
+                cpu.a = 0xFF
+                cpu.x = 0x05
+                write(cpu, 0x0104, 0x01)
+
+                val cycles = cpu.step()
+
+                cpu.a shouldBe 0x01
+                (cpu.status and FLAG_ZERO) shouldBe 0
+                (cpu.status and FLAG_NEGATIVE) shouldBe 0
+                cycles shouldBe 5
+            }
+            // Absolute,Y cross: base $00FE + Y=0x02 -> $0100
+            run {
+                val cpu = setupCpuWithInstruction(0x39, 0xFE, 0x00) // AND abs,Y
+                cpu.a = 0xFF
+                cpu.y = 0x02
+                write(cpu, 0x0100, 0x80)
+
+                val cycles = cpu.step()
+
+                cpu.a shouldBe 0x80
+                (cpu.status and FLAG_ZERO) shouldBe 0
+                (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+                cycles shouldBe 5
+            }
+        }
+
+        // 3) Page-cross penalty for (Indirect),Y
+        "(Indirect),Y should add +1 cycle on page cross" {
+            // Pointer at $0040/$0041 = $00FF; Y=+2 → eff $0101 (crosses $00xx → $01xx)
+            val cpu = setupCpuWithInstruction(0x31, 0x40) // AND (ind),Y
+            cpu.a = 0x7F
+            cpu.y = 0x02
+            write(cpu, 0x0040, 0xFF) // lo
+            write(cpu, 0x0041, 0x00) // hi  → base = $00FF
+            write(cpu, 0x0101, 0x7F) // effective addr after Y
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x7F
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 6
+        }
+    }
 })
