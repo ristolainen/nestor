@@ -405,6 +405,82 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "TXA instruction" - {
+        "should transfer X into A" {
+            val cpu = setupCpuWithInstruction(0x8A) // TXA
+            cpu.x = 0x42
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x42
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should set ZERO flag when result is 0" {
+            val cpu = setupCpuWithInstruction(0x8A)
+            cpu.x = 0x00
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x00
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should set NEGATIVE flag when bit 7 is set" {
+            val cpu = setupCpuWithInstruction(0x8A)
+            cpu.x = 0x80
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 2
+        }
+    }
+
+    "TYA instruction" - {
+        "should transfer Y into A" {
+            val cpu = setupCpuWithInstruction(0x98) // TYA
+            cpu.y = 0x42
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x42
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should set ZERO flag when result is 0" {
+            val cpu = setupCpuWithInstruction(0x98)
+            cpu.y = 0x00
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x00
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "should set NEGATIVE flag when bit 7 is set" {
+            val cpu = setupCpuWithInstruction(0x98)
+            cpu.y = 0x80
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 2
+        }
+    }
+
     "Compare immediate (CMP/CPX/CPY)" - {
 
         fun setup(loadOp: Int, regVal: Int, cmpOp: Int, imm: Int): Triple<CPU, Int, Int> {

@@ -88,12 +88,14 @@ class CPU(
         0x85 -> staZeroPage()
         0x86 -> stxZeroPage()
         0x88 -> dey()
+        0x8A -> txa()
         0x8D -> sdaAbsolute()
         0x90 -> bcc()
         0x91 -> staIndirectY()
         0x94 -> styZeroPageX()
         0x95 -> staZeroPageX()
         0x96 -> stxZeroPageY()
+        0x98 -> tya()
         0x99 -> staAbsoluteY()
         0x9A -> txs()
         0x9D -> staAbsoluteX()
@@ -459,6 +461,18 @@ class CPU(
     private fun dey() = 2.also {
         y -= 1
         setZN(y)
+    }
+
+    // Transfer X to A
+    private fun txa() = 2.also {
+        a = x
+        setZN(a)
+    }
+
+    // Transfer Y to A
+    private fun tya() = 2.also {
+        a = y
+        setZN(a)
     }
 
     // Increment X
