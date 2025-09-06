@@ -1135,4 +1135,93 @@ class CPUTest : FreeSpec({
             cycles shouldBe 6
         }
     }
+
+    "JMP absolute (4C)" - {
+
+        "should set PC to the target address and take 3 cycles" {
+            // Place: 4C <lo> <hi> at reset PC
+            val target = 0xC123
+            val lo = target and 0xFF
+            val hi = (target ushr 8) and 0xFF
+
+            val cpu = setupCpuWithInstruction(0x4C, lo, hi)
+
+            val cycles = cpu.step()
+
+            cpu.pc shouldBe target
+            cycles shouldBe 3
+        }
+
+        "should not modify processor flags" {
+            val target = 0xBEEF
+            val lo = target and 0xFF
+            val hi = (target ushr 8) and 0xFF
+
+            val cpu = setupCpuWithInstruction(0x4C, lo, hi)
+            // Seed flags with a non-trivial pattern
+            val originalStatus = 0b1010_0101
+            cpu.status = originalStatus
+
+            cpu.step()
+
+            cpu.status shouldBe originalStatus
+            cpu.pc shouldBe target
+        }
+    }
+
+    "JMP (indirect) (6C)" - {
+
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        "should jump to the address fetched from the pointer" {
+            // Program: 6C <ptrLo> <ptrHi>
+            val ptr = 0x1000
+            val target = 0xC0DE
+            val cpu = setupCpuWithInstruction(0x6C, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+
+            // Pointer table at $3000 → low/high of target
+            write(cpu, ptr, target and 0xFF)                 // [$3000] = DE
+            write(cpu, ptr + 1, (target ushr 8) and 0xFF)    // [$3001] = C0
+
+            val cycles = cpu.step()
+
+            cpu.pc shouldBe target
+            cycles shouldBe 5
+        }
+
+        "should emulate the page-wrap bug when pointer ends in FF" {
+            // Pointer = $03FF → high byte read from $0300 (same page), not $0400
+            val ptr = 0x03FF
+            val cpu = setupCpuWithInstruction(0x6C, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+
+            // Place bytes to demonstrate the bug:
+            // [$03FF] = 0x34 (low)
+            // [$0400] = 0x12 (what a 'correct' CPU would read for high — but we must NOT)
+            // [$0300] = 0xAB (what the 6502 actually reads due to wrap)
+            write(cpu, 0x03FF, 0x34)
+            write(cpu, 0x0400, 0x12)
+            write(cpu, 0x0300, 0xAB)
+
+            cpu.step()
+
+            // Expected PC = $AB34 (not $1234)
+            cpu.pc shouldBe 0xAB34
+        }
+
+        "should not modify processor flags" {
+            val ptr = 0x1500
+            val target = 0xBEEF
+            val cpu = setupCpuWithInstruction(0x6C, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+            val originalStatus = 0b1101_0011
+            cpu.status = originalStatus
+
+            write(cpu, ptr, target and 0xFF)
+            write(cpu, ptr + 1, (target ushr 8) and 0xFF)
+
+            cpu.step()
+
+            cpu.status shouldBe originalStatus
+            cpu.pc shouldBe target
+        }
+    }
 })

@@ -79,8 +79,10 @@ class CPU(
         0x35 -> andZeroPageX()
         0x39 -> andAbsoluteY()
         0x3D -> andAbsoluteX()
+        0x4C -> jmpAbsolute()
         0x50 -> bvc()
         0x60 -> rts()
+        0x6C -> jmpIndirect()
         0x70 -> bvs()
         0x78 -> sei()
         0x81 -> staIndirectX()
@@ -301,6 +303,21 @@ class CPU(
 
     // Branch if overflow clear
     private fun bvc() = branchIf(!oSet())
+
+    // Jump absolute
+    private fun jmpAbsolute() = 3.also {
+        pc = readNextWord()
+    }
+
+    // Jump indirect
+    private fun jmpIndirect() = 5.also {
+        val ptr = readNextWord()
+        val lo = memory.read(ptr)
+        // Compensate for a hardware bug that happens when the low byte is FF
+        val hiAddr = (ptr and 0xFF00) or ((ptr + 1) and 0x00FF)
+        val hi = memory.read(hiAddr)
+        pc = word(lo, hi)
+    }
 
     // Return from subroutine
     private fun rts() = 6.also {
