@@ -16,7 +16,7 @@ fun main() {
     //fakeNameTables(memoryBus)
 
     val screen = ScreenRenderer()
-    //displayScreen(screen)
+    displayScreen(screen)
 
     //ppu.renderFrame()
     //screen.draw(ppu.currentFrame())

@@ -1224,4 +1224,111 @@ class CPUTest : FreeSpec({
             cpu.pc shouldBe target
         }
     }
+
+    "INC memory variants (no RMW checks)" - {
+
+        // Minimal test harness: load bytes at $8000 and point reset vector there
+        fun setupCpuWith(vararg bytes: Int): CPU {
+            val prg = ByteArray(0x4000)
+            bytes.forEachIndexed { i, b -> prg[i] = b.toByte() }
+            // Reset vector -> $8000
+            prg[0x3FFC] = 0x00
+            prg[0x3FFD] = 0x80.toByte()
+            val ppu = PPU(emptyList())
+            val bus = MemoryBus(ppu, prg)
+            return CPU(bus).also { it.reset() }
+        }
+
+        @Suppress("ArrayInDataClass")
+        data class Case(
+            val label: String,
+            val bytes: IntArray,           // opcode + operand(s)
+            val setup: (CPU) -> Unit,      // e.g., set X/status
+            val effAddr: Int,              // effective target address
+            val startVal: Int,             // initial M
+            val expectVal: Int,            // final M
+            val expectZ: Int,              // expected Z flag bit (FLAG_ZERO or 0)
+            val expectN: Int,              // expected N flag bit (FLAG_NEGATIVE or 0)
+            val expectCycles: Int
+        )
+
+        io.kotest.data.forAll(
+            // ZP (E6 $10): 0x2A -> 0x2B, 5 cycles
+            row(
+                Case(
+                    label = "INC ZP (E6 $10)",
+                    bytes = intArrayOf(0xE6, 0x10),
+                    setup = { /* no-op */ },
+                    effAddr = 0x0010,
+                    startVal = 0x2A,
+                    expectVal = 0x2B,
+                    expectZ = 0, expectN = 0,
+                    expectCycles = 5
+                )
+            ),
+            // ZP,X (F6 $F0) with X=0x20 → wraps to $10, 6 cycles; 0x7F -> 0x80 sets N
+            row(
+                Case(
+                    label = "INC ZP,X (F6 \$F0) wraps to $10 with X=0x20",
+                    bytes = intArrayOf(0xF6, 0xF0),
+                    setup = { cpu -> cpu.x = 0x20 },
+                    effAddr = 0x0010,
+                    startVal = 0x7F,
+                    expectVal = 0x80,
+                    expectZ = 0, expectN = FLAG_NEGATIVE,
+                    expectCycles = 6
+                )
+            ),
+            // ABS (EE $12 $00) → $0012, 6 cycles; 0xFF -> 0x00 sets Z
+            row(
+                Case(
+                    label = "INC ABS (EE $12 $00) -> $0012",
+                    bytes = intArrayOf(0xEE, 0x12, 0x00),
+                    setup = { /* no-op */ },
+                    effAddr = 0x0012,
+                    startVal = 0xFF,
+                    expectVal = 0x00,
+                    expectZ = FLAG_ZERO, expectN = 0,
+                    expectCycles = 6
+                )
+            ),
+            // ABS,X (FE $FF $00) + X=0x05 -> base $00FF + 5 = $0104; fixed 7 cycles
+            row(
+                Case(
+                    label = "INC ABS,X (FE \$FF $00) + X=0x05 -> $0104 (7 cycles)",
+                    bytes = intArrayOf(0xFE, 0xFF, 0x00),
+                    setup = { cpu -> cpu.x = 0x05 },
+                    effAddr = 0x0104,
+                    startVal = 0x3C,
+                    expectVal = 0x3D,
+                    expectZ = 0, expectN = 0,
+                    expectCycles = 7
+                )
+            )
+        ) { c ->
+            c.label {
+                val cpu = setupCpuWith(*c.bytes)
+                c.setup(cpu)
+                // Pre-set other flags to ensure only Z/N are relevant for assertions
+                cpu.status = FLAG_CARRY or FLAG_OVERFLOW
+                cpu.memory.write(c.effAddr, c.startVal)
+
+                val cycles = cpu.step()
+
+                // Memory result
+                cpu.memory.read(c.effAddr) shouldBe c.expectVal
+
+                // Z/N flags from final value only
+                (cpu.status and FLAG_ZERO) shouldBe c.expectZ
+                (cpu.status and FLAG_NEGATIVE) shouldBe c.expectN
+
+                // Other flags unchanged by INC
+                (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+                (cpu.status and FLAG_OVERFLOW) shouldBe FLAG_OVERFLOW
+
+                // Fixed cycle counts per addressing mode
+                cycles shouldBe c.expectCycles
+            }
+        }
+    }
 })

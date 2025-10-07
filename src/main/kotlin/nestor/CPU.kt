@@ -117,9 +117,13 @@ class CPU(
         0xD0 -> bne()
         0xD8 -> cld()
         0xE0 -> cpxImmediate()
+        0xE6 -> incZeroPage()
         0xE8 -> inx()
         0xEA -> noop()
+        0xEE -> incAbsolute()
         0xF0 -> beq()
+        0xF6 -> incZeroPageX()
+        0xFE -> incAbsoluteX()
         else -> unknown(opcode)
     }.also { cycles += it }
 
@@ -466,6 +470,40 @@ class CPU(
         setFlag(reg >= v, FLAG_CARRY)
         setFlag(diff == 0, FLAG_ZERO)
         setFlag((diff and 0x80) != 0, FLAG_NEGATIVE)
+    }
+
+    // Increment memory zero page
+    private fun incZeroPage() = 5.also {
+        val addr = readNextByte()
+        incrementMemory(addr)
+    }
+
+    // Increment memory zero page X
+    private fun incZeroPageX() = 6.also {
+        val base = readNextByte()
+        val addr = (base + x).to8bits()
+        incrementMemory(addr)
+    }
+
+    // Increment memory absolute
+    private fun incAbsolute() = 6.also {
+        val addr = readNextWord()
+        incrementMemory(addr)
+    }
+
+    // Increment memory absolute X
+    private fun incAbsoluteX() = 7.also {
+        val base = readNextWord()
+        val addr = (base + x).to16bits()
+        incrementMemory(addr)
+    }
+
+    private fun incrementMemory(addr: Int) {
+        val v = memory.read(addr)
+        memory.write(addr, v)
+        val nv = (v + 1).to8bits()
+        memory.write(addr, nv)
+        setZN(nv)
     }
 
     // Decrement X
