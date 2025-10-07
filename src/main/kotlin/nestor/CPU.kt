@@ -119,12 +119,14 @@ class CPU(
         0x9A -> txs()
         0x9D -> staAbsoluteX()
         0xA0 -> ldyImmediate()
+        0xA1 -> ldaIndirectX()
         0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
         0xAC -> ldyAbsolute()
         0xAD -> ldaAbsolute()
         0xAE -> ldxAbsolute()
         0xB0 -> bcs()
+        0xB1 -> ldaIndirectY()
         0xB9 -> ldaAbsoluteY()
         0xBD -> ldaAbsoluteX()
         0xC0 -> cpyImmediate()
@@ -433,6 +435,28 @@ class CPU(
     private fun ldyImmediate() = 2.also {
         y = readNextByte()
         setZN(y)
+    }
+
+    // Load A indirect X
+    private fun ldaIndirectX() = 6.also {
+        val zp = (readNextByte() + x).to8bits()
+        val lo = memory.read(zp)
+        val hi = memory.read((zp + 1).to8bits())
+        val addr = word(lo, hi)
+        a = memory.read(addr)
+        setZN(a)
+    }
+
+    // Load A indirect Y
+    private fun ldaIndirectY(): Int {
+        val zp = readNextByte()
+        val lo = memory.read(zp)
+        val hi = memory.read((zp + 1).to8bits())
+        val base = word(lo, hi)
+        val addr = (base + y).to16bits()
+        a = memory.read(addr)
+        setZN(a)
+        return 5 + crossPageCycles(base, addr)
     }
 
     // Load accumulator immediate

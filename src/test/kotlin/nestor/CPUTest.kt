@@ -232,6 +232,95 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "Indexed-indirect and Indirect-indexed loads (LDA A1/B1)" - {
+
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        // LDA ($zp,X) — 0xA1 (always 6 cycles)
+        "LDA (zp,X) loads via zp pointer; zero-page wrap on (zp+X)" {
+            val cpu = setupCpuWithInstruction(0xA1, 0x10)
+            cpu.x = 0x04
+
+            // pointer -> $10FF (RAM mirror region: $0000–$1FFF)
+            write(cpu, 0x0014, 0xFF)
+            write(cpu, 0x0015, 0x10)
+            write(cpu, 0x10FF, 0x80)
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 6
+        }
+
+        "LDA (zp,X) wraps (FF + X) low byte in zero page" {
+            val cpu = setupCpuWithInstruction(0xA1, 0xFF)
+            cpu.x = 0x02
+
+            // pointer -> $1234 (also in RAM mirror region)
+            write(cpu, 0x0001, 0x34)
+            write(cpu, 0x0002, 0x12)
+            write(cpu, 0x1234, 0x2A)
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x2A
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 6
+        }
+
+        // LDA ($zp),Y — 0xB1 (5 base, +1 on page cross)
+        "LDA (zp),Y loads without page cross (5 cycles)" {
+            val cpu = setupCpuWithInstruction(0xB1, 0x10)
+            // base = $1000 (safe)
+            write(cpu, 0x0010, 0x00)
+            write(cpu, 0x0011, 0x10)
+            cpu.y = 0x04
+            write(cpu, 0x1004, 0x55)
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x55
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 5
+        }
+
+        "LDA (zp),Y adds +1 cycle on page cross (6 cycles)" {
+            val cpu = setupCpuWithInstruction(0xB1, 0x10)
+            // base = $10FF, Y=0x02 -> $1101 (cross from $10xx to $11xx)
+            write(cpu, 0x0010, 0xFF)
+            write(cpu, 0x0011, 0x10)
+            cpu.y = 0x02
+            write(cpu, 0x1101, 0x80)
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 6
+        }
+
+        "LDA (zp),Y wraps high-byte fetch at zp=FF (no page cross → 5 cycles)" {
+            val cpu = setupCpuWithInstruction(0xB1, 0xFF)
+            // pointer at $00FF/$0000 -> $1234 (safe)
+            write(cpu, 0x00FF, 0x34)
+            write(cpu, 0x0000, 0x12)
+            cpu.y = 0x01
+            write(cpu, 0x1235, 0x2A)
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x2A
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 5
+        }
+    }
+
     "Branches (BPL/BMI/BEQ/BNE/BCS/BCC/BVS/BVC)" - {
         fun targetPc(startPC: Int, offset: Int): Int {
             val nextPC = (startPC + 2) and 0xFFFF
