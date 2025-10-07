@@ -35,12 +35,13 @@ class Emulation(
         }
     }
 
-    private fun step() = Trace.traceOnce(cpu, ppu, memoryBus) {
+    internal fun step() = Trace.traceOnce(cpu, ppu, memoryBus) {
         if (cpu.abort) {
             System.exit(0)
         }
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)
+        cpu.pollNmi()
         cpuCycles
     }
 }

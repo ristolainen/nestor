@@ -41,6 +41,8 @@ class PPU(
     internal var scanline = 0
     internal var cycle = 0
     internal var frame: Long = 0
+    internal var nmiOutput = false
+    internal var nmiOccurred = false
 
     fun tick(cycles: Int) {
         repeat(cycles) {
@@ -51,10 +53,12 @@ class PPU(
                 when (scanline) {
                     241 -> { // start of VBlank
                         setStatusFlag(STATUS_VBLANK)
+                        nmiOccurred = true
                     }
                     261 -> { // pre-render line
                         clearStatusFlag(STATUS_VBLANK)
                         writeToggle = false
+                        nmiOccurred = false
                     }
                 }
                 if (scanline >= 262) {
@@ -89,6 +93,7 @@ class PPU(
         val result = status or (status and 0xE0) // NMI + sprite flags
         clearStatusFlag(STATUS_VBLANK)
         writeToggle = false      // Reset address latch
+        nmiOccurred = false
         return result
     }
 
@@ -117,6 +122,7 @@ class PPU(
 
     private fun writeControl(value: Int) {
         control = value
+        nmiOutput = (value and 0x80) != 0
         // Bits 0–1 of control specify the base nametable address.
         // These are copied into bits 10–11 of tempAddr as part of the scroll setup.
         // This allows fine X/Y scrolling and rendering to use the correct nametable region.

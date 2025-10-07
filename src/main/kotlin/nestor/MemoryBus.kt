@@ -1,7 +1,7 @@
 package nestor
 
 open class MemoryBus(
-    private val ppu: PPU,
+    internal val ppu: PPU,
     private val prgRom: ByteArray,
     private val cpuRam: ByteArray = ByteArray(0x0800),
 ) {

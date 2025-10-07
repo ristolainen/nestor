@@ -57,6 +57,23 @@ class CPU(
         return decodeAndExecute(opcode)
     }
 
+    fun pollNmi() {
+        if (memory.ppu.nmiOccurred && memory.ppu.nmiOutput) {
+            triggerNmi()
+            memory.ppu.nmiOccurred = false // acknowledge
+        }
+    }
+
+    private fun triggerNmi() {
+        push(pc.highByte())
+        push(pc.lowByte())
+        push(status and 0xEF)
+        setStatusFlag(FLAG_INTERRUPT_DISABLE)
+        val lo = memory.read(0xFFFA)
+        val hi = memory.read(0xFFFB)
+        pc = word(lo, hi)
+    }
+
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
         0x01 -> oraIndirectX()
         0x05 -> oraZeroPage()

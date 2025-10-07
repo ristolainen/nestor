@@ -178,19 +178,19 @@ object Trace {
         val flagsStr = flagsToString(p)
         val cycAfter = getCycles(cpu)
         val ppuSnap = PpuFrame(
-            scanline = tryGetInt(ppu, "scanline"),
-            dot = tryGetInt(ppu, "dot") ?: tryGetInt(ppu, "cycle"),
-            frame = tryGetLong(ppu, "frame")?.toLong(),
+            scanline = ppu.scanline,
+            dot = ppu.cycle,
+            frame = ppu.frame,
             v = tryGetInt(ppu, "v"),
             t = tryGetInt(ppu, "t"),
             fineX = tryGetInt(ppu, "x") ?: tryGetInt(ppu, "fineX"),
             w = tryGetInt(ppu, "w"),
-            nmiOutput = tryGetBool(ppu, "nmiOutput"),
-            nmiOccurred = tryGetBool(ppu, "nmiOccurred"),
-            mask = tryReadPpuReg(ppu, "mask"),
-            ctrl = tryReadPpuReg(ppu, "ctrl"),
-            status = tryReadPpuReg(ppu, "status"),
-            oamAddr = tryGetInt(ppu, "oamAddr"),
+            nmiOutput = ppu.nmiOutput,
+            nmiOccurred = ppu.nmiOccurred,
+            mask = ppu.mask,
+            ctrl = ppu.control,
+            status = ppu.status,
+            oamAddr = ppu.oamAddr,
             openBus = tryGetInt(ppu, "openBus")
         )
 
