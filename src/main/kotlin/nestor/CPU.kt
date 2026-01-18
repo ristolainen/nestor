@@ -96,9 +96,12 @@ class CPU(
         0x35 -> andZeroPageX()
         0x39 -> andAbsoluteY()
         0x3D -> andAbsoluteX()
+        0x48 -> pha()
+        0x4A -> lsrAccumulator()
         0x4C -> jmpAbsolute()
         0x50 -> bvc()
         0x60 -> rts()
+        0x68 -> pla()
         0x6C -> jmpIndirect()
         0x70 -> bvs()
         0x78 -> sei()
@@ -122,6 +125,7 @@ class CPU(
         0xA1 -> ldaIndirectX()
         0xA2 -> ldxImmediate()
         0xA9 -> ldaImmediate()
+        0xAA -> tax()
         0xAC -> ldyAbsolute()
         0xAD -> ldaAbsolute()
         0xAE -> ldxAbsolute()
@@ -129,6 +133,7 @@ class CPU(
         0xB1 -> ldaIndirectY()
         0xB9 -> ldaAbsoluteY()
         0xBD -> ldaAbsoluteX()
+        0xBE -> ldxAbsoluteY()
         0xC0 -> cpyImmediate()
         0xC8 -> iny()
         0xC9 -> cmpImmediate()
@@ -321,11 +326,31 @@ class CPU(
         setFlag((m and 0x40) != 0, FLAG_OVERFLOW)
     }
 
+    // Logical Shift Right, accumulator
+    private fun lsrAccumulator() = 2.also {
+        val old = a
+        val carry = old and 0x01
+        val shifted = (old ushr 1) and 0xFF
+        a = shifted
+        setFlag(carry != 0, FLAG_CARRY)
+        setFlag(shifted == 0, FLAG_ZERO)
+        clearStatusFlag(FLAG_NEGATIVE)
+    }
+
     // Branch if minus
     private fun bmi() = branchIf(nSet())
 
     // Branch if overflow clear
     private fun bvc() = branchIf(!oSet())
+
+    // Push A
+    private fun pha() = 3.also { push(a) }
+
+    // Pull A
+    private fun pla() = 4.also {
+        a = pull()
+        setZN(a)
+    }
 
     // Jump absolute
     private fun jmpAbsolute() = 3.also {
@@ -425,6 +450,12 @@ class CPU(
         sp = x
     }
 
+    // Transfer A to X
+    private fun tax() = 2.also {
+        x = a
+        setZN(x)
+    }
+
     // Load X immediate
     private fun ldxImmediate() = 2.also {
         x = readNextByte()
@@ -493,6 +524,16 @@ class CPU(
         val address = (base + i).to16bits()
         a = memory.read(address)
         setZN(a)
+        return 4 + crossPageCycles(base, address)
+    }
+
+    private fun ldxAbsoluteY() = ldxAbsoluteI(y)
+
+    private fun ldxAbsoluteI(i: Int): Int {
+        val base = readNextWord()
+        val address = (base + i).to16bits()
+        x = memory.read(address)
+        setZN(x)
         return 4 + crossPageCycles(base, address)
     }
 

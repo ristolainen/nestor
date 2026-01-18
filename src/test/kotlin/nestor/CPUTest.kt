@@ -321,6 +321,79 @@ class CPUTest : FreeSpec({
         }
     }
 
+    "Absolute,Y loads (LDX BE)" - {
+
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        // LDX $abs,Y — 0xBE (4 base, +1 on page cross)
+        "LDX abs,Y loads without page cross (4 cycles)" {
+            val cpu = setupCpuWithInstruction(0xBE, 0x00, 0x10) // $1000
+            cpu.y = 0x0A
+            write(cpu, 0x100A, 0x55)
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x55
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 4
+        }
+
+        "LDX abs,Y adds +1 cycle on page cross (5 cycles)" {
+            val cpu = setupCpuWithInstruction(0xBE, 0xFF, 0x10) // base $10FF
+            cpu.y = 0x02 // -> $2101 (crosses $20xx -> $21xx)
+            write(cpu, 0x1101, 0x80)
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 5
+        }
+
+        "LDX abs,Y sets ZERO when result is 0 (no page cross → 4 cycles)" {
+            val cpu = setupCpuWithInstruction(0xBE, 0x10, 0x40) // $4010
+            cpu.y = 0x00
+            write(cpu, 0x4010, 0x00)
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x00
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 4
+        }
+
+        "LDX abs,Y reads from correct effective address (base + Y) (no page cross → 4 cycles)" {
+            val cpu = setupCpuWithInstruction(0xBE, 0x34, 0x12) // base $1234
+            cpu.y = 0x10 // -> $1244
+            write(cpu, 0x1234, 0x11)
+            write(cpu, 0x1244, 0x2A)
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x2A
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 4
+        }
+
+        "LDX abs,Y wraps 16-bit effective address (FFFF + 1 -> 0000); page cross counts (+1) (5 cycles)" {
+            val cpu = setupCpuWithInstruction(0xBE, 0xFF, 0xFF) // base $FFFF
+            cpu.y = 0x01 // -> $0000 (16-bit wrap)
+            write(cpu, 0x0000, 0x2A)
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x2A
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            // If your crossPageCycles compares high byte of base vs effective, this will be a "cross" (FF -> 00)
+            cycles shouldBe 5
+        }
+    }
+
     "Branches (BPL/BMI/BEQ/BNE/BCS/BCC/BVS/BVC)" - {
         fun targetPc(startPC: Int, offset: Int): Int {
             val nextPC = (startPC + 2) and 0xFFFF
@@ -1418,6 +1491,143 @@ class CPUTest : FreeSpec({
                 // Fixed cycle counts per addressing mode
                 cycles shouldBe c.expectCycles
             }
+        }
+    }
+
+    "Logical Shift Right, accumulator (LSR 4A)" - {
+
+        // LSR A — 0x4A (always 2 cycles)
+        "LSR A shifts right; bit0 -> C; clears N; result non-zero (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0x4A)
+            cpu.a = 0b0000_0011 // 3 -> 1, carry=1
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0b0000_0001
+            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "LSR A sets ZERO when result is 0; carry from bit0 (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0x4A)
+            cpu.a = 0x01 // -> 0x00, carry=1
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x00
+            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+            (cpu.status and FLAG_ZERO) shouldBe FLAG_ZERO
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "LSR A clears C when bit0 was 0 (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0x4A)
+            cpu.a = 0x02 // 0b10 -> 0b1, carry=0
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x01
+            (cpu.status and FLAG_CARRY) shouldBe 0
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "LSR A always clears NEGATIVE even if A had bit7 set (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0x4A)
+            cpu.a = 0x80 // 0b1000_0000 -> 0b0100_0000, carry=0
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x40
+            (cpu.status and FLAG_CARRY) shouldBe 0
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+
+        "LSR A produces correct result for an odd value: floor(A/2); remainder in C (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0x4A)
+            cpu.a = 0xFF // 255 -> 127, carry=1
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x7F
+            (cpu.status and FLAG_CARRY) shouldBe FLAG_CARRY
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe 0
+            cycles shouldBe 2
+        }
+    }
+
+    "Transfer A to X (TAX AA)" - {
+
+        // TAX — 0xAA (always 2 cycles)
+        "TAX copies A into X and sets N/Z correctly (2 cycles)" {
+            val cpu = setupCpuWithInstruction(0xAA)
+            cpu.a = 0x80
+
+            val cycles = cpu.step()
+
+            cpu.x shouldBe 0x80
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            cycles shouldBe 2
+        }
+    }
+
+    "Push Accumulator (PHA 48)" - {
+
+        fun read(cpu: CPU, addr: Int) = cpu.memory.read(addr)
+
+        // PHA — 0x48 (always 3 cycles)
+        "PHA pushes A onto stack; SP decremented; flags unchanged (3 cycles)" {
+            val cpu = setupCpuWithInstruction(0x48)
+            cpu.a = 0x42
+            cpu.sp = 0xFD
+            val statusBefore = cpu.status
+
+            val cycles = cpu.step()
+
+            // Value pushed at $0100 + old SP
+            read(cpu, 0x01FD) shouldBe 0x42
+            cpu.sp shouldBe 0xFC
+
+            // Flags must be unchanged
+            cpu.status shouldBe statusBefore
+
+            cycles shouldBe 3
+        }
+    }
+
+    "Pull Accumulator (PLA 68)" - {
+
+        fun write(cpu: CPU, addr: Int, value: Int) = cpu.memory.write(addr, value)
+
+        // PLA — 0x68 (always 4 cycles)
+        "PLA pulls value into A; SP incremented; sets N/Z; other flags unchanged (4 cycles)" {
+            val cpu = setupCpuWithInstruction(0x68)
+
+            // Stack setup: value will be pulled from $01FD
+            cpu.sp = 0xFC
+            write(cpu, 0x01FD, 0x80)
+
+            val statusBefore =
+                cpu.status and (FLAG_CARRY or FLAG_OVERFLOW) // flags PLA must not change
+
+            val cycles = cpu.step()
+
+            cpu.a shouldBe 0x80
+            cpu.sp shouldBe 0xFD
+
+            (cpu.status and FLAG_NEGATIVE) shouldBe FLAG_NEGATIVE
+            (cpu.status and FLAG_ZERO) shouldBe 0
+            (cpu.status and (FLAG_CARRY or FLAG_OVERFLOW)) shouldBe statusBefore
+
+            cycles shouldBe 4
         }
     }
 })
