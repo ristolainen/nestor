@@ -112,6 +112,15 @@ class CPU(
         // Stack
         Opcode.PHA -> pha()
         Opcode.PLA -> pla()
+        // EOR
+        Opcode.EOR_IMM -> eorImmediate()
+        Opcode.EOR_ZP  -> eorZeroPage()
+        Opcode.EOR_ZPX -> eorZeroPageX()
+        Opcode.EOR_ABS -> eorAbsolute()
+        Opcode.EOR_ABX -> eorAbsoluteX()
+        Opcode.EOR_ABY -> eorAbsoluteY()
+        Opcode.EOR_INX -> eorIndirectX()
+        Opcode.EOR_INY -> eorIndirectY()
         // AND
         Opcode.AND_IMM -> andImmediate()
         Opcode.AND_ZP  -> andZeroPage()
@@ -434,6 +443,53 @@ class CPU(
     private fun oraIndirectY(): Int {
         val (v, extra) = readIndirectY()
         a = a or v
+        setZN(a)
+        return 5 + extra
+    }
+
+    // EOR
+    private fun eorImmediate() = 2.also {
+        a = a xor readNextByte()
+        setZN(a)
+    }
+
+    private fun eorZeroPage() = 3.also {
+        a = a xor memory.read(addrZeroPage())
+        setZN(a)
+    }
+
+    private fun eorZeroPageX() = 4.also {
+        a = a xor memory.read(addrZeroPageI(x))
+        setZN(a)
+    }
+
+    private fun eorAbsolute() = 4.also {
+        a = a xor memory.read(addrAbsolute())
+        setZN(a)
+    }
+
+    private fun eorAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
+        a = a xor v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun eorAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        a = a xor v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun eorIndirectX() = 6.also {
+        a = a xor memory.read(addrIndirectX())
+        setZN(a)
+    }
+
+    private fun eorIndirectY(): Int {
+        val (v, extra) = readIndirectY()
+        a = a xor v
         setZN(a)
         return 5 + extra
     }

@@ -277,6 +277,129 @@ class CPUInstructionTest : FreeSpec({
         )
     }
 
+    // ── EOR ──────────────────────────────────────────────────────────────
+    "EOR immediate" - {
+        testStep(
+            "XORs bits",
+            Instruction(EOR_IMM, 0x0F),
+            CpuSetup()
+                .a(0xFF),
+            ExpectedStepOutcome(cycles = 2, a = 0xF0, zero = false, negative = true)
+        )
+        testStep(
+            "zero result sets Z",
+            Instruction(EOR_IMM, 0xFF),
+            CpuSetup()
+                .a(0xFF),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, zero = true, negative = false)
+        )
+    }
+    "EOR zero page" - {
+        testStep(
+            "basic",
+            Instruction(EOR_ZP, 0x10),
+            CpuSetup()
+                .a(0xFF)
+                .mem(0x10, 0x0F),
+            ExpectedStepOutcome(cycles = 3, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR zero page,X" - {
+        testStep(
+            "indexed",
+            Instruction(EOR_ZPX, 0x10),
+            CpuSetup()
+                .a(0xFF)
+                .x(0x04)
+                .mem(0x14, 0x0F),
+            ExpectedStepOutcome(cycles = 4, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR absolute" - {
+        testStep(
+            "basic",
+            Instruction(EOR_ABS, 0x00, 0x02),
+            CpuSetup()
+                .a(0xFF)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 4, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR absolute,X" - {
+        testStep(
+            "no page cross",
+            Instruction(EOR_ABX, 0x00, 0x02),
+            CpuSetup()
+                .a(0xFF)
+                .x(0x01)
+                .mem(0x0201, 0x0F),
+            ExpectedStepOutcome(cycles = 4, a = 0xF0, zero = false, negative = true)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(EOR_ABX, 0xFF, 0x01),
+            CpuSetup()
+                .a(0xFF)
+                .x(0x01)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 5, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR absolute,Y" - {
+        testStep(
+            "no page cross",
+            Instruction(EOR_ABY, 0x00, 0x02),
+            CpuSetup()
+                .a(0xFF)
+                .y(0x01)
+                .mem(0x0201, 0x0F),
+            ExpectedStepOutcome(cycles = 4, a = 0xF0, zero = false, negative = true)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(EOR_ABY, 0xFF, 0x01),
+            CpuSetup()
+                .a(0xFF)
+                .y(0x01)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 5, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR (indirect,X)" - {
+        testStep(
+            "basic",
+            Instruction(EOR_INX, 0x10),
+            CpuSetup()
+                .a(0xFF)
+                .x(0x04)
+                .mem(0x14, 0x00, 0x02)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 6, a = 0xF0, zero = false, negative = true)
+        )
+    }
+    "EOR (indirect),Y" - {
+        testStep(
+            "no page cross",
+            Instruction(EOR_INY, 0x10),
+            CpuSetup()
+                .a(0xFF)
+                .y(0x01)
+                .mem(0x10, 0x00, 0x02)
+                .mem(0x0201, 0x0F),
+            ExpectedStepOutcome(cycles = 5, a = 0xF0, zero = false, negative = true)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(EOR_INY, 0x10),
+            CpuSetup()
+                .a(0xFF)
+                .y(0x01)
+                .mem(0x10, 0xFF, 0x01)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 6, a = 0xF0, zero = false, negative = true)
+        )
+    }
+
     // ── BIT ──────────────────────────────────────────────────────────────
     // BIT: Z = (A & M) == 0, N = M bit 7, V = M bit 6. A is not modified.
     "BIT zero page" - {
