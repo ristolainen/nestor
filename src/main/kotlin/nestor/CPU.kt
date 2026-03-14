@@ -143,7 +143,16 @@ class CPU(
         Opcode.BIT_ZP  -> bitZeroPage()
         Opcode.BIT_ABS -> bitAbsolute()
         // Shift
+        Opcode.ASL_ACC -> aslAccumulator()
+        Opcode.ASL_ZP  -> aslZeroPage()
+        Opcode.ASL_ZPX -> aslZeroPageX()
+        Opcode.ASL_ABS -> aslAbsolute()
+        Opcode.ASL_ABX -> aslAbsoluteX()
         Opcode.LSR_ACC -> lsrAccumulator()
+        Opcode.LSR_ZP  -> lsrZeroPage()
+        Opcode.LSR_ZPX -> lsrZeroPageX()
+        Opcode.LSR_ABS -> lsrAbsolute()
+        Opcode.LSR_ABX -> lsrAbsoluteX()
         // ROR
         Opcode.ROR_ACC -> rorAccumulator()
         Opcode.ROR_ZP  -> rorZeroPage()
@@ -516,14 +525,44 @@ class CPU(
     }
 
     // Shift
-    private fun lsrAccumulator() = 2.also {
-        val old = a
-        val carry = old and 0x01
-        val shifted = (old ushr 1) and 0xFF
-        a = shifted
-        setFlag(carry != 0, FLAG_CARRY)
-        setFlag(shifted == 0, FLAG_ZERO)
-        clearStatusFlag(FLAG_NEGATIVE)
+    // ASL
+    private fun aslAccumulator() = 2.also { a = shiftLeft(a) }
+    private fun aslZeroPage()  = 5.also { shiftLeftMemory(addrZeroPage()) }
+    private fun aslZeroPageX() = 6.also { shiftLeftMemory(addrZeroPageI(x)) }
+    private fun aslAbsolute()  = 6.also { shiftLeftMemory(addrAbsolute()) }
+    private fun aslAbsoluteX() = 7.also { shiftLeftMemory(addrAbsoluteI(x)) }
+
+    private fun shiftLeft(v: Int): Int {
+        val result = (v shl 1) and 0xFF
+        setFlag((v and 0x80) != 0, FLAG_CARRY)
+        setZN(result)
+        return result
+    }
+
+    private fun shiftLeftMemory(addr: Int) {
+        val v = memory.read(addr)
+        memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
+        memory.write(addr, shiftLeft(v))
+    }
+
+    // LSR
+    private fun lsrAccumulator() = 2.also { a = shiftRight(a) }
+    private fun lsrZeroPage()  = 5.also { shiftRightMemory(addrZeroPage()) }
+    private fun lsrZeroPageX() = 6.also { shiftRightMemory(addrZeroPageI(x)) }
+    private fun lsrAbsolute()  = 6.also { shiftRightMemory(addrAbsolute()) }
+    private fun lsrAbsoluteX() = 7.also { shiftRightMemory(addrAbsoluteI(x)) }
+
+    private fun shiftRight(v: Int): Int {
+        val result = (v ushr 1) and 0xFF
+        setFlag((v and 0x01) != 0, FLAG_CARRY)
+        setZN(result)
+        return result
+    }
+
+    private fun shiftRightMemory(addr: Int) {
+        val v = memory.read(addr)
+        memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
+        memory.write(addr, shiftRight(v))
     }
 
     // ROR
