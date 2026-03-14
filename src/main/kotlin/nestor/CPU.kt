@@ -167,6 +167,15 @@ class CPU(
         Opcode.ROL_ZPX -> rolZeroPageX()
         Opcode.ROL_ABS -> rolAbsolute()
         Opcode.ROL_ABX -> rolAbsoluteX()
+        // ADC
+        Opcode.ADC_IMM -> adcImmediate()
+        Opcode.ADC_ZP  -> adcZeroPage()
+        Opcode.ADC_ZPX -> adcZeroPageX()
+        Opcode.ADC_ABS -> adcAbsolute()
+        Opcode.ADC_ABX -> adcAbsoluteX()
+        Opcode.ADC_ABY -> adcAbsoluteY()
+        Opcode.ADC_INX -> adcIndirectX()
+        Opcode.ADC_INY -> adcIndirectY()
         // SBC
         Opcode.SBC_IMM -> sbcImmediate()
         Opcode.SBC_ZP  -> sbcZeroPage()
@@ -623,6 +632,42 @@ class CPU(
         val v = memory.read(addr)
         memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
         memory.write(addr, rotateLeft(v))
+    }
+
+    // ADC
+    private fun adcImmediate() = 2.also { adc(readNextByte()) }
+    private fun adcZeroPage()  = 3.also { adc(memory.read(addrZeroPage())) }
+    private fun adcZeroPageX() = 4.also { adc(memory.read(addrZeroPageI(x))) }
+    private fun adcAbsolute()  = 4.also { adc(memory.read(addrAbsolute())) }
+
+    private fun adcAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
+        adc(v)
+        return 4 + extra
+    }
+
+    private fun adcAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        adc(v)
+        return 4 + extra
+    }
+
+    private fun adcIndirectX() = 6.also { adc(memory.read(addrIndirectX())) }
+
+    private fun adcIndirectY(): Int {
+        val (v, extra) = readIndirectY()
+        adc(v)
+        return 5 + extra
+    }
+
+    private fun adc(m: Int) {
+        val carry = if (cSet()) 1 else 0
+        val result = a + m + carry
+        val overflow = ((a xor result) and (m xor result) and 0x80) != 0
+        a = result and 0xFF
+        setFlag(result > 0xFF, FLAG_CARRY)
+        setFlag(overflow, FLAG_OVERFLOW)
+        setZN(a)
     }
 
     // SBC

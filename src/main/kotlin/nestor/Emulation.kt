@@ -41,7 +41,7 @@ class Emulation(
 
         cpu.reset()
         var cycles = 0
-        while (cycles < 120000) {
+        while (cycles < 500000) {
             cycles += step()
         }
 
