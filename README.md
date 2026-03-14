@@ -71,7 +71,7 @@ The emulator is being built in the following stages:
 
 ## 📦 Build Instructions
 
-> Prerequisites: JDK 17+, Gradle, a ROM file (`.nes`)
+> Prerequisites: JDK 21+, Gradle, a ROM file (`.nes`)
 
 ```bash
 git clone https://github.com/ristolainen/nestor.git
