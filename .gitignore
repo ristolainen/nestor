@@ -44,3 +44,6 @@ local.properties
 *.dylib
 
 roms/
+
+# Claude Code
+.claude/

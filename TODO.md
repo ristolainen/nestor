@@ -105,4 +105,14 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 
 ---
 
+## 🏗️ Architecture / Tech Debt
+
+- [ ] Scanline-accurate PPU rendering — replace batch `renderFrame()` with per-scanline rendering driven by `tick()`, so mid-frame scroll writes (e.g. SMB HUD split) work correctly
+- [ ] Log unknown opcodes — `else` branch in CPU decode should throw/log instead of silently corrupting state
+- [ ] Give PPU its own address bus — replace pre-parsed tile list with a PPU bus ($0000–$3FFF); required for CHR-RAM and any mapper beyond NROM
+- [ ] Replace reflection in `Trace.kt` — use `CpuState`/`PpuState` data class snapshots instead of Java reflection, so tracing doesn't break silently on renames
+- [ ] Implement IRQ — wire IRQ into CPU interrupt poll alongside NMI; needed for DMC audio, MMC3 timing, and `BRK` (requires `PHP`/`PLP`/`RTI` first)
+
+---
+
 _Track progress, stay motivated, and enjoy the journey!_

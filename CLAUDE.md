@@ -45,6 +45,24 @@ The emulator has three core subsystems that interact via a clock-driven loop:
 
 **`ScreenRenderer.kt`** — Swing `JPanel` that displays PPU frames at 3× scale (768×720).
 
+## Git
+
+Do not add Claude as a co-author in commit messages.
+
+## Implementation Plans
+
+Plans for larger changes live in `.claude/plans/` — check here for context on planned or in-progress work before starting an implementation.
+
+## Reference Material
+
+Saved reference docs live in `.claude/reference/` — read these when implementing or debugging CPU/PPU behaviour:
+
+- `ref_6502_instructions.md` — all 56 instructions: opcodes, addressing modes, cycle counts, flags
+- `ref_ppu_registers.md` — $2000–$2007 bit layouts, read/write behaviour, internal v/t/x/w registers
+- `ref_ppu_scrolling.md` — scroll register internals, write sequences, per-scanline t→v copy rules
+- `ref_cpu_memory_map.md` — full address space, mirroring, interrupt vectors, Mapper 0 specifics
+- `ref_cycle_timing.md` — CPU/PPU cycles per scanline/frame, master clock, key timing landmarks
+
 ## Coding Style
 
 - Idiomatic Kotlin: prefer `when` expressions over `if-else`, prefer expression bodies over block bodies
