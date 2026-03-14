@@ -75,249 +75,351 @@ class CPU(
     }
 
     private fun decodeAndExecute(opcode: Int) = when (opcode) {
-        0x01 -> oraIndirectX()
-        0x05 -> oraZeroPage()
-        0x09 -> oraImmediate()
-        0x0D -> oraAbsolute()
-        0x10 -> bpl()
-        0x11 -> oraIndirectY()
-        0x15 -> oraZeroPageX()
-        0x19 -> oraAbsoluteY()
-        0x1D -> oraAbsoluteX()
-        0x20 -> jsr()
-        0x21 -> andIndirectX()
-        0x24 -> bitZeroPage()
-        0x25 -> andZeroPage()
-        0x29 -> andImmediate()
-        0x2C -> bitAbsolute()
-        0x2D -> andAbsolute()
-        0x30 -> bmi()
-        0x31 -> andIndirectY()
-        0x35 -> andZeroPageX()
-        0x39 -> andAbsoluteY()
-        0x3D -> andAbsoluteX()
-        0x48 -> pha()
-        0x4A -> lsrAccumulator()
-        0x4C -> jmpAbsolute()
-        0x50 -> bvc()
-        0x60 -> rts()
-        0x68 -> pla()
-        0x6C -> jmpIndirect()
-        0x70 -> bvs()
-        0x78 -> sei()
-        0x81 -> staIndirectX()
-        0x84 -> styZeroPage()
-        0x85 -> staZeroPage()
-        0x86 -> stxZeroPage()
-        0x88 -> dey()
-        0x8A -> txa()
-        0x8D -> sdaAbsolute()
-        0x90 -> bcc()
-        0x91 -> staIndirectY()
-        0x94 -> styZeroPageX()
-        0x95 -> staZeroPageX()
-        0x96 -> stxZeroPageY()
-        0x98 -> tya()
-        0x99 -> staAbsoluteY()
-        0x9A -> txs()
-        0x9D -> staAbsoluteX()
-        0xA0 -> ldyImmediate()
-        0xA1 -> ldaIndirectX()
-        0xA2 -> ldxImmediate()
+        // LDA
         0xA9 -> ldaImmediate()
-        0xAA -> tax()
-        0xAC -> ldyAbsolute()
         0xAD -> ldaAbsolute()
-        0xAE -> ldxAbsolute()
-        0xB0 -> bcs()
-        0xB1 -> ldaIndirectY()
-        0xB9 -> ldaAbsoluteY()
         0xBD -> ldaAbsoluteX()
+        0xB9 -> ldaAbsoluteY()
+        0xA1 -> ldaIndirectX()
+        0xB1 -> ldaIndirectY()
+        // LDX
+        0xA2 -> ldxImmediate()
+        0xAE -> ldxAbsolute()
         0xBE -> ldxAbsoluteY()
-        0xC0 -> cpyImmediate()
-        0xC8 -> iny()
+        // LDY
+        0xA0 -> ldyImmediate()
+        0xAC -> ldyAbsolute()
+        // STA
+        0x85 -> staZeroPage()
+        0x95 -> staZeroPageX()
+        0x8D -> staAbsolute()
+        0x9D -> staAbsoluteX()
+        0x99 -> staAbsoluteY()
+        0x81 -> staIndirectX()
+        0x91 -> staIndirectY()
+        // STX
+        0x86 -> stxZeroPage()
+        0x96 -> stxZeroPageY()
+        // STY
+        0x84 -> styZeroPage()
+        0x94 -> styZeroPageX()
+        // Transfer
+        0xAA -> tax()
+        0x8A -> txa()
+        0x98 -> tya()
+        0x9A -> txs()
+        // Stack
+        0x48 -> pha()
+        0x68 -> pla()
+        // AND
+        0x29 -> andImmediate()
+        0x25 -> andZeroPage()
+        0x35 -> andZeroPageX()
+        0x2D -> andAbsolute()
+        0x3D -> andAbsoluteX()
+        0x39 -> andAbsoluteY()
+        0x21 -> andIndirectX()
+        0x31 -> andIndirectY()
+        // ORA
+        0x09 -> oraImmediate()
+        0x05 -> oraZeroPage()
+        0x15 -> oraZeroPageX()
+        0x0D -> oraAbsolute()
+        0x1D -> oraAbsoluteX()
+        0x19 -> oraAbsoluteY()
+        0x01 -> oraIndirectX()
+        0x11 -> oraIndirectY()
+        // BIT
+        0x24 -> bitZeroPage()
+        0x2C -> bitAbsolute()
+        // Shift
+        0x4A -> lsrAccumulator()
+        // Compare
         0xC9 -> cmpImmediate()
-        0xCA -> dex()
-        0xD0 -> bne()
-        0xD8 -> cld()
         0xE0 -> cpxImmediate()
-        0xE6 -> incZeroPage()
-        0xE8 -> inx()
-        0xEA -> noop()
-        0xEE -> incAbsolute()
+        0xC0 -> cpyImmediate()
+        // Branch
+        0x10 -> bpl()
+        0x30 -> bmi()
+        0x50 -> bvc()
+        0x70 -> bvs()
+        0x90 -> bcc()
+        0xB0 -> bcs()
+        0xD0 -> bne()
         0xF0 -> beq()
+        // INC/DEC
+        0xE6 -> incZeroPage()
         0xF6 -> incZeroPageX()
+        0xEE -> incAbsolute()
         0xFE -> incAbsoluteX()
+        0xE8 -> inx()
+        0xC8 -> iny()
+        0xCA -> dex()
+        0x88 -> dey()
+        // Jump / call
+        0x4C -> jmpAbsolute()
+        0x6C -> jmpIndirect()
+        0x20 -> jsr()
+        0x60 -> rts()
+        // Flags
+        0x78 -> sei()
+        0xD8 -> cld()
+        // Misc
+        0xEA -> noop()
         else -> unknown(opcode)
     }.also { cycles += it }
 
-    // Bitwise OR immediate
-    private fun oraImmediate() = 2.also {
-        val v = readNextByte()
-        a = a or v
-        setZN(a)
-    }
+    // ── Addressing mode helpers ───────────────────────────────────────────────
 
-    // Bitwise OR zero page
-    private fun oraZeroPage() = 3.also {
-        val addr = readNextByte()
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
-    }
+    // Effective address resolvers — return the address, no memory read.
+    // Use these for write and read-modify-write instructions.
+    private fun addrZeroPage() = readNextByte()
+    private fun addrZeroPageI(index: Int) = (readNextByte() + index).to8bits()
+    private fun addrAbsolute() = readNextWord()
+    private fun addrAbsoluteI(index: Int) = (readNextWord() + index).to16bits()
 
-    // Bitwise OR zero page X
-    private fun oraZeroPageX() = 4.also {
-        val base = readNextByte()
-        val addr = (base + x).to8bits()
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
-    }
-
-    // Bitwise OR absolute
-    private fun oraAbsolute() = 4.also {
-        val addr = readNextWord()
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
-    }
-
-    // Bitwise OR absolute X
-    private fun oraAbsoluteX() = oraAbsoluteI(x)
-
-    // Bitwise OR absolute Y
-    private fun oraAbsoluteY() = oraAbsoluteI(y)
-
-    // Bitwise OR absolute indexes
-    private fun oraAbsoluteI(i: Int): Int {
-        val base = readNextWord()
-        val addr = (base + i).to16bits()
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
-        return 4 + crossPageCycles(base, addr)
-    }
-
-    // Bitwise OR indirect X
-    private fun oraIndirectX() = 6.also {
-        val base = readNextByte()
-        val zpAddr = (base + x).to8bits()
+    private fun addrIndirectX(): Int {
+        val zpAddr = (readNextByte() + x).to8bits()
         val lo = memory.read(zpAddr)
         val hi = memory.read((zpAddr + 1).to8bits())
-        val addr = word(lo, hi)
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
+        return word(lo, hi)
     }
 
-    // Bitwise OR indirect Y
-    private fun oraIndirectY(): Int {
+    // Returns (effectiveAddr, baseAddr). The base is needed by readIndirectY()
+    // to detect page crossing; write instructions can ignore it with `_`.
+    private fun addrIndirectY(): Pair<Int, Int> {
         val zpAddr = readNextByte()
         val lo = memory.read(zpAddr)
         val hi = memory.read((zpAddr + 1).to8bits())
         val base = word(lo, hi)
-        val addr = (base + y).to16bits()
-        val v = memory.read(addr)
-        a = a or v
-        setZN(a)
-        return 5 + crossPageCycles(base, addr)
+        return (base + y).to16bits() to base
     }
 
-    // Bitwise AND immediate
+    // Page-crossing value readers — return (value, extraCycles).
+    // Use these for read-only instructions on absolute-indexed and indirect-Y modes.
+    private fun readAbsoluteI(index: Int): Pair<Int, Int> {
+        val base = addrAbsolute()
+        val addr = (base + index).to16bits()
+        return memory.read(addr) to crossPageCycles(base, addr)
+    }
+
+    private fun readIndirectY(): Pair<Int, Int> {
+        val (addr, base) = addrIndirectY()
+        return memory.read(addr) to crossPageCycles(base, addr)
+    }
+
+    // ── Instructions ─────────────────────────────────────────────────────────
+
+    // LDA
+    private fun ldaImmediate() = 2.also {
+        a = readNextByte()
+        setZN(a)
+    }
+
+    private fun ldaAbsolute() = 4.also {
+        a = memory.read(addrAbsolute())
+        setZN(a)
+    }
+
+    private fun ldaAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
+        a = v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun ldaAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        a = v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun ldaIndirectX() = 6.also {
+        a = memory.read(addrIndirectX())
+        setZN(a)
+    }
+
+    private fun ldaIndirectY(): Int {
+        val (v, extra) = readIndirectY()
+        a = v
+        setZN(a)
+        return 5 + extra
+    }
+
+    // LDX
+    private fun ldxImmediate() = 2.also {
+        x = readNextByte()
+        setZN(x)
+    }
+
+    private fun ldxAbsolute() = 4.also {
+        x = memory.read(addrAbsolute())
+        setZN(x)
+    }
+
+    private fun ldxAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        x = v
+        setZN(x)
+        return 4 + extra
+    }
+
+    // LDY
+    private fun ldyImmediate() = 2.also {
+        y = readNextByte()
+        setZN(y)
+    }
+
+    private fun ldyAbsolute() = 4.also {
+        y = memory.read(addrAbsolute())
+        setZN(y)
+    }
+
+    // STA
+    private fun staZeroPage()  = 3.also { memory.write(addrZeroPage(), a) }
+    private fun staZeroPageX() = 4.also { memory.write(addrZeroPageI(x), a) }
+    private fun staAbsolute()  = 4.also { memory.write(addrAbsolute(), a) }
+    private fun staAbsoluteX() = 5.also { memory.write(addrAbsoluteI(x), a) }
+    private fun staAbsoluteY() = 5.also { memory.write(addrAbsoluteI(y), a) }
+    private fun staIndirectX() = 6.also { memory.write(addrIndirectX(), a) }
+
+    private fun staIndirectY() = 6.also {
+        val (addr, _) = addrIndirectY()
+        memory.write(addr, a)
+    }
+
+    // STX
+    private fun stxZeroPage()  = 3.also { memory.write(addrZeroPage(), x) }
+    private fun stxZeroPageY() = 4.also { memory.write(addrZeroPageI(y), x) }
+
+    // STY
+    private fun styZeroPage()  = 3.also { memory.write(addrZeroPage(), y) }
+    private fun styZeroPageX() = 4.also { memory.write(addrZeroPageI(x), y) }
+
+    // Transfer
+    private fun tax() = 2.also {
+        x = a
+        setZN(x)
+    }
+
+    private fun txa() = 2.also {
+        a = x
+        setZN(a)
+    }
+
+    private fun tya() = 2.also {
+        a = y
+        setZN(a)
+    }
+
+    private fun txs() = 2.also { sp = x }
+
+    // Stack
+    private fun pha() = 3.also { push(a) }
+
+    private fun pla() = 4.also {
+        a = pull()
+        setZN(a)
+    }
+
+    // AND
     private fun andImmediate() = 2.also {
-        val v = readNextByte()
-        a = a and v
+        a = a and readNextByte()
         setZN(a)
     }
 
-    // Bitwise AND zero page
     private fun andZeroPage() = 3.also {
-        val addr = readNextByte()
-        val v = memory.read(addr)
-        a = a and v
+        a = a and memory.read(addrZeroPage())
         setZN(a)
     }
 
-    // Bitwise AND zero page X
     private fun andZeroPageX() = 4.also {
-        val base = readNextByte()
-        val addr = (base + x).to8bits()
-        val v = memory.read(addr)
-        a = a and v
+        a = a and memory.read(addrZeroPageI(x))
         setZN(a)
     }
 
-    // Bitwise AND absolute
     private fun andAbsolute() = 4.also {
-        val addr = readNextWord()
-        val v = memory.read(addr)
-        a = a and v
+        a = a and memory.read(addrAbsolute())
         setZN(a)
     }
 
-    // Bitwise AND absolute X
-    private fun andAbsoluteX() = andAbsoluteI(x)
-
-    // Bitwise AND absolute Y
-    private fun andAbsoluteY() = andAbsoluteI(y)
-
-    // Bitwise OR absolute indexes
-    private fun andAbsoluteI(i: Int): Int {
-        val base = readNextWord()
-        val addr = (base + i).to16bits()
-        val v = memory.read(addr)
+    private fun andAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
         a = a and v
         setZN(a)
-        return 4 + crossPageCycles(base, addr)
+        return 4 + extra
     }
 
-    // Bitwise AND indirect X
+    private fun andAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        a = a and v
+        setZN(a)
+        return 4 + extra
+    }
+
     private fun andIndirectX() = 6.also {
-        val base = readNextByte()
-        val zpAddr = (base + x).to8bits()
-        val lo = memory.read(zpAddr)
-        val hi = memory.read((zpAddr + 1).to8bits())
-        val addr = word(lo, hi)
-        val v = memory.read(addr)
-        a = a and v
+        a = a and memory.read(addrIndirectX())
         setZN(a)
     }
 
-    // Bitwise AND indirect Y
     private fun andIndirectY(): Int {
-        val zpAddr = readNextByte()
-        val lo = memory.read(zpAddr)
-        val hi = memory.read((zpAddr + 1).to8bits())
-        val base = word(lo, hi)
-        val addr = (base + y).to16bits()
-        val v = memory.read(addr)
+        val (v, extra) = readIndirectY()
         a = a and v
         setZN(a)
-        return 5 + crossPageCycles(base, addr)
+        return 5 + extra
     }
 
-    // Branch if plus
-    private fun bpl() = branchIf(!nSet())
-
-    // Jump to Subroutine
-    private fun jsr() = 6.also {
-        val target = readNextWord()
-        val ret = (pc - 1).to16bits()
-        push(ret.highByte())
-        push(ret.lowByte())
-        pc = target
+    // ORA
+    private fun oraImmediate() = 2.also {
+        a = a or readNextByte()
+        setZN(a)
     }
 
-    // Bit test zero page
-    private fun bitZeroPage() = 3.also {
-        bitTest(readNextByte())
+    private fun oraZeroPage() = 3.also {
+        a = a or memory.read(addrZeroPage())
+        setZN(a)
     }
 
-    // Bit test absolute
-    private fun bitAbsolute() = 4.also {
-        bitTest(readNextWord())
+    private fun oraZeroPageX() = 4.also {
+        a = a or memory.read(addrZeroPageI(x))
+        setZN(a)
     }
+
+    private fun oraAbsolute() = 4.also {
+        a = a or memory.read(addrAbsolute())
+        setZN(a)
+    }
+
+    private fun oraAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
+        a = a or v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun oraAbsoluteY(): Int {
+        val (v, extra) = readAbsoluteI(y)
+        a = a or v
+        setZN(a)
+        return 4 + extra
+    }
+
+    private fun oraIndirectX() = 6.also {
+        a = a or memory.read(addrIndirectX())
+        setZN(a)
+    }
+
+    private fun oraIndirectY(): Int {
+        val (v, extra) = readIndirectY()
+        a = a or v
+        setZN(a)
+        return 5 + extra
+    }
+
+    // BIT
+    private fun bitZeroPage() = 3.also { bitTest(addrZeroPage()) }
+    private fun bitAbsolute()  = 4.also { bitTest(addrAbsolute()) }
 
     private fun bitTest(addr: Int) {
         val m = memory.read(addr)
@@ -326,7 +428,7 @@ class CPU(
         setFlag((m and 0x40) != 0, FLAG_OVERFLOW)
     }
 
-    // Logical Shift Right, accumulator
+    // Shift
     private fun lsrAccumulator() = 2.also {
         val old = a
         val carry = old and 0x01
@@ -337,213 +439,9 @@ class CPU(
         clearStatusFlag(FLAG_NEGATIVE)
     }
 
-    // Branch if minus
-    private fun bmi() = branchIf(nSet())
-
-    // Branch if overflow clear
-    private fun bvc() = branchIf(!oSet())
-
-    // Push A
-    private fun pha() = 3.also { push(a) }
-
-    // Pull A
-    private fun pla() = 4.also {
-        a = pull()
-        setZN(a)
-    }
-
-    // Jump absolute
-    private fun jmpAbsolute() = 3.also {
-        pc = readNextWord()
-    }
-
-    // Jump indirect
-    private fun jmpIndirect() = 5.also {
-        val ptr = readNextWord()
-        val lo = memory.read(ptr)
-        // Compensate for a hardware bug that happens when the low byte is FF
-        val hiAddr = (ptr and 0xFF00) or ((ptr + 1) and 0x00FF)
-        val hi = memory.read(hiAddr)
-        pc = word(lo, hi)
-    }
-
-    // Return from subroutine
-    private fun rts() = 6.also {
-        val lo = pull()
-        val hi = pull()
-        val ret = word(lo, hi)
-        pc = ret + 1
-    }
-
-    // Branch if overflow set
-    private fun bvs() = branchIf(oSet())
-
-    // Set interrupt
-    private fun sei() = 2.also {
-        setStatusFlag(FLAG_INTERRUPT_DISABLE)
-    }
-
-    // Store accumulator zero page addressing
-    private fun staZeroPage() = 3.also { stZeroPage(a, 0) }
-
-    // Store accumulator with X zero page addressing
-    private fun staZeroPageX() = 4.also { stZeroPage(a, x) }
-
-    // Store X zero page addressing
-    private fun stxZeroPage() = 3.also { stZeroPage(x, 0) }
-
-    // Store X with Y zero page addressing
-    private fun stxZeroPageY() = 4.also { stZeroPage(x, y) }
-
-    // Store A absolute X
-    private fun staAbsoluteX() = staAbsoluteI(x)
-
-    // Store A absolute Y
-    private fun staAbsoluteY() = staAbsoluteI(y)
-
-    private fun staAbsoluteI(i: Int) = 5.also {
-        val addr = (readNextWord() + i).to16bits()
-        memory.write(addr, a)
-    }
-
-    // Store Y zero page addressing
-    private fun styZeroPage() = 3.also { stZeroPage(y, 0) }
-
-    // Store Y with X zero page addressing
-    private fun styZeroPageX() = 4.also { stZeroPage(y, x) }
-
-    private fun stZeroPage(v: Int, o: Int) {
-        val addr = (readNextByte() + o).to8bits()
-        memory.write(addr, v)
-    }
-
-    // Store accumulator absolute addressing
-    private fun sdaAbsolute() = 4.also {
-        val addr = readNextWord()
-        memory.write(addr, a)
-    }
-
-    // Branch if carry clear
-    private fun bcc() = branchIf(!cSet())
-
-    // Store A indirect X
-    private fun staIndirectX() = 6.also {
-        val zp = (readNextByte() + x).to8bits()
-        val lo = memory.read(zp)
-        val hi = memory.read((zp + 1).to8bits())
-        val addr = word(lo, hi)
-        memory.write(addr, a)
-    }
-
-    // Store A indirect Y
-    private fun staIndirectY() = 6.also {
-        val zp = readNextByte()
-        val lo = memory.read(zp)
-        val hi = memory.read((zp + 1).to8bits())
-        val base = word(lo, hi)
-        val addr = (base + y).to16bits()
-        memory.write(addr, a)
-    }
-
-    // Transfer X to stack pointer
-    private fun txs() = 2.also {
-        sp = x
-    }
-
-    // Transfer A to X
-    private fun tax() = 2.also {
-        x = a
-        setZN(x)
-    }
-
-    // Load X immediate
-    private fun ldxImmediate() = 2.also {
-        x = readNextByte()
-        setZN(x)
-    }
-
-    // Load Y immediate
-    private fun ldyImmediate() = 2.also {
-        y = readNextByte()
-        setZN(y)
-    }
-
-    // Load A indirect X
-    private fun ldaIndirectX() = 6.also {
-        val zp = (readNextByte() + x).to8bits()
-        val lo = memory.read(zp)
-        val hi = memory.read((zp + 1).to8bits())
-        val addr = word(lo, hi)
-        a = memory.read(addr)
-        setZN(a)
-    }
-
-    // Load A indirect Y
-    private fun ldaIndirectY(): Int {
-        val zp = readNextByte()
-        val lo = memory.read(zp)
-        val hi = memory.read((zp + 1).to8bits())
-        val base = word(lo, hi)
-        val addr = (base + y).to16bits()
-        a = memory.read(addr)
-        setZN(a)
-        return 5 + crossPageCycles(base, addr)
-    }
-
-    // Load accumulator immediate
-    private fun ldaImmediate() = 2.also {
-        a = readNextByte()
-        setZN(a)
-    }
-
-    // Load accumulator absolute
-    private fun ldaAbsolute() = 4.also {
-        val address = readNextWord()
-        a = memory.read(address)
-        setZN(a)
-    }
-
-    // Load X absolute
-    private fun ldxAbsolute() = 4.also {
-        val address = readNextWord()
-        x = memory.read(address)
-        setZN(x)
-    }
-
-    // Branch if carry set
-    private fun bcs() = branchIf(cSet())
-
-    // Load A absolute X
-    private fun ldaAbsoluteX() = ldaAbsoluteI(x)
-
-    // Load A absolute Y
-    private fun ldaAbsoluteY() = ldaAbsoluteI(y)
-
-    private fun ldaAbsoluteI(i: Int): Int {
-        val base = readNextWord()
-        val address = (base + i).to16bits()
-        a = memory.read(address)
-        setZN(a)
-        return 4 + crossPageCycles(base, address)
-    }
-
-    private fun ldxAbsoluteY() = ldxAbsoluteI(y)
-
-    private fun ldxAbsoluteI(i: Int): Int {
-        val base = readNextWord()
-        val address = (base + i).to16bits()
-        x = memory.read(address)
-        setZN(x)
-        return 4 + crossPageCycles(base, address)
-    }
-
-    // Compare A immediate
+    // Compare
     private fun cmpImmediate() = cmImmediate(a)
-
-    // Compare X immediate
     private fun cpxImmediate() = cmImmediate(x)
-
-    // Compare Y immediate
     private fun cpyImmediate() = cmImmediate(y)
 
     private fun cmImmediate(reg: Int) = 2.also {
@@ -554,103 +452,90 @@ class CPU(
         setFlag((diff and 0x80) != 0, FLAG_NEGATIVE)
     }
 
-    // Increment memory zero page
-    private fun incZeroPage() = 5.also {
-        val addr = readNextByte()
-        incrementMemory(addr)
-    }
+    // Branch
+    private fun bpl() = branchIf(!nSet())
+    private fun bmi() = branchIf(nSet())
+    private fun bvc() = branchIf(!oSet())
+    private fun bvs() = branchIf(oSet())
+    private fun bcc() = branchIf(!cSet())
+    private fun bcs() = branchIf(cSet())
+    private fun bne() = branchIf(!zSet())
+    private fun beq() = branchIf(zSet())
 
-    // Increment memory zero page X
-    private fun incZeroPageX() = 6.also {
-        val base = readNextByte()
-        val addr = (base + x).to8bits()
-        incrementMemory(addr)
-    }
-
-    // Increment memory absolute
-    private fun incAbsolute() = 6.also {
-        val addr = readNextWord()
-        incrementMemory(addr)
-    }
-
-    // Increment memory absolute X
-    private fun incAbsoluteX() = 7.also {
-        val base = readNextWord()
-        val addr = (base + x).to16bits()
-        incrementMemory(addr)
-    }
+    // INC/DEC
+    private fun incZeroPage()  = 5.also { incrementMemory(addrZeroPage()) }
+    private fun incZeroPageX() = 6.also { incrementMemory(addrZeroPageI(x)) }
+    private fun incAbsolute()  = 6.also { incrementMemory(addrAbsolute()) }
+    private fun incAbsoluteX() = 7.also { incrementMemory(addrAbsoluteI(x)) }
 
     private fun incrementMemory(addr: Int) {
         val v = memory.read(addr)
-        memory.write(addr, v)
+        memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
         val nv = (v + 1).to8bits()
         memory.write(addr, nv)
         setZN(nv)
     }
 
-    // Decrement X
-    private fun dex() = 2.also {
-        x -= 1
-        setZN(x)
-    }
-
-    // Decrement Y
-    private fun dey() = 2.also {
-        y -= 1
-        setZN(y)
-    }
-
-    // Transfer X to A
-    private fun txa() = 2.also {
-        a = x
-        setZN(a)
-    }
-
-    // Transfer Y to A
-    private fun tya() = 2.also {
-        a = y
-        setZN(a)
-    }
-
-    // Increment X
     private fun inx() = 2.also {
         x += 1
         setZN(x)
     }
 
-    // Increment Y
     private fun iny() = 2.also {
         y += 1
         setZN(y)
     }
 
-    // Branch if not equal
-    private fun bne() = branchIf(!zSet())
+    private fun dex() = 2.also {
+        x -= 1
+        setZN(x)
+    }
 
-    // Load Y absolute
-    private fun ldyAbsolute() = 4.also {
-        val addr = readNextWord()
-        y = memory.read(addr)
+    private fun dey() = 2.also {
+        y -= 1
         setZN(y)
     }
 
-    // Clear decimal
-    private fun cld() = 2.also {
-        clearStatusFlag(FLAG_DECIMAL)
+    // Jump / call
+    private fun jmpAbsolute() = 3.also { pc = addrAbsolute() }
+
+    private fun jmpIndirect() = 5.also {
+        val ptr = addrAbsolute()
+        val lo = memory.read(ptr)
+        // Hardware bug: high byte wraps within the same page when low byte is 0xFF
+        val hiAddr = (ptr and 0xFF00) or ((ptr + 1) and 0x00FF)
+        val hi = memory.read(hiAddr)
+        pc = word(lo, hi)
     }
 
-    // No-op
-    private fun noop() = 2
+    private fun jsr() = 6.also {
+        val target = readNextWord()
+        val ret = (pc - 1).to16bits()
+        push(ret.highByte())
+        push(ret.lowByte())
+        pc = target
+    }
 
-    // Branch if equal
-    private fun beq() = branchIf(zSet())
+    private fun rts() = 6.also {
+        val lo = pull()
+        val hi = pull()
+        pc = word(lo, hi) + 1
+    }
+
+    // Flags
+    private fun sei() = 2.also { setStatusFlag(FLAG_INTERRUPT_DISABLE) }
+    private fun cld() = 2.also { clearStatusFlag(FLAG_DECIMAL) }
+
+    // Misc
+    private fun noop() = 2
 
     private fun unknown(opcode: Int) = 1.also {
         println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
         abort = true
     }
 
-    // Update Zero/Negative for any 8-bit value
+    // ── Flag helpers ─────────────────────────────────────────────────────────
+
     private fun setZN(value: Int) {
         setZ(value)
         setN(value)
@@ -680,17 +565,18 @@ class CPU(
         status = status and flag.inv()
     }
 
+    // ── Branch helper ─────────────────────────────────────────────────────────
+
     private fun branchIf(condition: Boolean): Int {
         val offset = readNextByte().toByte().toInt()
-        var cycles = 2
-
-        if (condition) {
-            val target = (pc + offset).to16bits()
-            cycles += 1 + crossPageCycles(pc, target)
-            pc = target
-        }
-        return cycles
+        if (!condition) return 2
+        val target = (pc + offset).to16bits()
+        val extra = 1 + crossPageCycles(pc, target)
+        pc = target
+        return 2 + extra
     }
+
+    // ── Memory helpers ────────────────────────────────────────────────────────
 
     private fun readNextByte(): Int {
         val value = memory.read(pc)
