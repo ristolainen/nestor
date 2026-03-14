@@ -1950,6 +1950,176 @@ class CPUInstructionTest : FreeSpec({
         )
     }
 
+    // ── SBC ──────────────────────────────────────────────────────────────
+    // SBC: A = A - M - (1 - C) = A + ~M + C. C=1 if no borrow. V set on signed overflow.
+    "SBC immediate" - {
+        testStep(
+            "no borrow, carry in set",
+            Instruction(SBC_IMM, 0x10),
+            CpuSetup()
+                .a(0x50)
+                .carry(true),
+            ExpectedStepOutcome(cycles = 2, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+        testStep(
+            "borrow occurs when carry in clear",
+            Instruction(SBC_IMM, 0x50),
+            CpuSetup()
+                .a(0x50)
+                .carry(false),
+            ExpectedStepOutcome(cycles = 2, a = 0xFF, carry = false, zero = false, negative = true, overflow = false)
+        )
+        testStep(
+            "zero result",
+            Instruction(SBC_IMM, 0x4F),
+            CpuSetup()
+                .a(0x50)
+                .carry(false),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, carry = true, zero = true, negative = false, overflow = false)
+        )
+        testStep(
+            "signed overflow positive minus negative",
+            Instruction(SBC_IMM, 0xB0),
+            CpuSetup()
+                .a(0x50)
+                .carry(true),
+            ExpectedStepOutcome(cycles = 2, a = 0xA0, carry = false, zero = false, negative = true, overflow = true)
+        )
+        testStep(
+            "signed overflow negative minus positive",
+            Instruction(SBC_IMM, 0x70),
+            CpuSetup()
+                .a(0xD0)
+                .carry(true),
+            ExpectedStepOutcome(cycles = 2, a = 0x60, carry = true, zero = false, negative = false, overflow = true)
+        )
+    }
+    "SBC zero page" - {
+        testStep(
+            "reads from zero page",
+            Instruction(SBC_ZP, 0x10),
+            CpuSetup()
+                .a(0x30)
+                .carry(true)
+                .mem(0x10, 0x10),
+            ExpectedStepOutcome(cycles = 3, a = 0x20, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC zero page,X" - {
+        testStep(
+            "indexed",
+            Instruction(SBC_ZPX, 0x10),
+            CpuSetup()
+                .a(0x30)
+                .x(0x04)
+                .carry(true)
+                .mem(0x14, 0x10),
+            ExpectedStepOutcome(cycles = 4, a = 0x20, carry = true, zero = false, negative = false, overflow = false)
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(SBC_ZPX, 0xFF),
+            CpuSetup()
+                .a(0x30)
+                .x(0x02)
+                .carry(true)
+                .mem(0x01, 0x10),
+            ExpectedStepOutcome(cycles = 4, a = 0x20, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC absolute" - {
+        testStep(
+            "reads from 16-bit address",
+            Instruction(SBC_ABS, 0x00, 0x02),
+            CpuSetup()
+                .a(0x50)
+                .carry(true)
+                .mem(0x0200, 0x10),
+            ExpectedStepOutcome(cycles = 4, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC absolute,X" - {
+        testStep(
+            "no page cross",
+            Instruction(SBC_ABX, 0x00, 0x02),
+            CpuSetup()
+                .a(0x50)
+                .x(0x01)
+                .carry(true)
+                .mem(0x0201, 0x10),
+            ExpectedStepOutcome(cycles = 4, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+        testStep(
+            "page cross adds cycle",
+            Instruction(SBC_ABX, 0xFF, 0x01),
+            CpuSetup()
+                .a(0x50)
+                .x(0x01)
+                .carry(true)
+                .mem(0x0200, 0x10),
+            ExpectedStepOutcome(cycles = 5, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC absolute,Y" - {
+        testStep(
+            "no page cross",
+            Instruction(SBC_ABY, 0x00, 0x02),
+            CpuSetup()
+                .a(0x50)
+                .y(0x01)
+                .carry(true)
+                .mem(0x0201, 0x10),
+            ExpectedStepOutcome(cycles = 4, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+        testStep(
+            "page cross adds cycle",
+            Instruction(SBC_ABY, 0xFF, 0x01),
+            CpuSetup()
+                .a(0x50)
+                .y(0x01)
+                .carry(true)
+                .mem(0x0200, 0x10),
+            ExpectedStepOutcome(cycles = 5, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC (indirect,X)" - {
+        testStep(
+            "reads via indexed indirect",
+            Instruction(SBC_INX, 0x20),
+            CpuSetup()
+                .a(0x50)
+                .x(0x04)
+                .carry(true)
+                .mem(0x24, 0x00, 0x03)
+                .mem(0x0300, 0x10),
+            ExpectedStepOutcome(cycles = 6, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+    "SBC (indirect),Y" - {
+        testStep(
+            "no page cross",
+            Instruction(SBC_INY, 0x20),
+            CpuSetup()
+                .a(0x50)
+                .y(0x01)
+                .carry(true)
+                .mem(0x20, 0x00, 0x03)
+                .mem(0x0301, 0x10),
+            ExpectedStepOutcome(cycles = 5, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+        testStep(
+            "page cross adds cycle",
+            Instruction(SBC_INY, 0x20),
+            CpuSetup()
+                .a(0x50)
+                .y(0x01)
+                .carry(true)
+                .mem(0x20, 0xFF, 0x02)
+                .mem(0x0300, 0x10),
+            ExpectedStepOutcome(cycles = 6, a = 0x40, carry = true, zero = false, negative = false, overflow = false)
+        )
+    }
+
     // ── NOP ──────────────────────────────────────────────────────────────
     "NOP implied" - {
         testStep(
