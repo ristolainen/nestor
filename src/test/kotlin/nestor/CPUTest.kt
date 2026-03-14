@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.data.blocking.forAll
 import io.kotest.data.row
 import io.kotest.matchers.shouldBe
+import nestor.Opcode.*
 
 class CPUTest : FreeSpec({
     fun setupCpuWithInstruction(
@@ -32,7 +33,7 @@ class CPUTest : FreeSpec({
 
     "SEI instruction" - {
         "should set the interrupt disable flag" {
-            val cpu = setupCpuWithInstruction(SEI)
+            val cpu = setupCpuWithInstruction(SEI.byte)
             cpu.status = 0b00000000
 
             val cycles = cpu.step()
@@ -44,7 +45,7 @@ class CPUTest : FreeSpec({
 
     "CLD instruction" - {
         "should clear the decimal mode flag" {
-            val cpu = setupCpuWithInstruction(CLD)
+            val cpu = setupCpuWithInstruction(CLD.byte)
             cpu.status = FLAG_DECIMAL
 
             val cycles = cpu.step()
@@ -58,20 +59,20 @@ class CPUTest : FreeSpec({
         "should load and set Z/N correctly" {
             forAll(
                 // label, opcode, imm, targetReg, expectedZ, expectedN, initialStatus
-                row("LDA non-zero", LDA_IMM, 0x42, 'A', 0, 0, 0),
-                row("LDA zero", LDA_IMM, 0x00, 'A', FLAG_ZERO, 0, 0),
-                row("LDA neg", LDA_IMM, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
-                row("LDA clear", LDA_IMM, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDA non-zero", LDA_IMM.byte, 0x42, 'A', 0, 0, 0),
+                row("LDA zero", LDA_IMM.byte, 0x00, 'A', FLAG_ZERO, 0, 0),
+                row("LDA neg", LDA_IMM.byte, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
+                row("LDA clear", LDA_IMM.byte, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-                row("LDX non-zero", LDX_IMM, 0x42, 'X', 0, 0, 0),
-                row("LDX zero", LDX_IMM, 0x00, 'X', FLAG_ZERO, 0, 0),
-                row("LDX neg", LDX_IMM, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
-                row("LDX clear", LDX_IMM, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDX non-zero", LDX_IMM.byte, 0x42, 'X', 0, 0, 0),
+                row("LDX zero", LDX_IMM.byte, 0x00, 'X', FLAG_ZERO, 0, 0),
+                row("LDX neg", LDX_IMM.byte, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
+                row("LDX clear", LDX_IMM.byte, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-                row("LDY non-zero", LDY_IMM, 0x33, 'Y', 0, 0, 0),
-                row("LDY zero", LDY_IMM, 0x00, 'Y', FLAG_ZERO, 0, 0),
-                row("LDY neg", LDY_IMM, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
-                row("LDY clear", LDY_IMM, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDY non-zero", LDY_IMM.byte, 0x33, 'Y', 0, 0, 0),
+                row("LDY zero", LDY_IMM.byte, 0x00, 'Y', FLAG_ZERO, 0, 0),
+                row("LDY neg", LDY_IMM.byte, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
+                row("LDY clear", LDY_IMM.byte, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
             ) { _, opcode, imm, target, expectedZ, expectedN, initialStatus ->
                 val cpu = setupCpuWithInstruction(opcode, imm)
                 cpu.status = initialStatus
@@ -96,20 +97,20 @@ class CPUTest : FreeSpec({
         "should load from absolute address and set Z/N correctly" {
             io.kotest.data.forAll(
                 // label, opcode, addrLo, addrHi, memVal, targetReg, expectedZ, expectedN, initialStatus
-                row("LDA non-zero", LDA_ABS, 0x10, 0x00, 0x42, 'A', 0, 0, 0),
-                row("LDA zero", LDA_ABS, 0x20, 0x00, 0x00, 'A', FLAG_ZERO, 0, 0),
-                row("LDA neg", LDA_ABS, 0x30, 0x00, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
-                row("LDA clear", LDA_ABS, 0x40, 0x00, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDA non-zero", LDA_ABS.byte, 0x10, 0x00, 0x42, 'A', 0, 0, 0),
+                row("LDA zero", LDA_ABS.byte, 0x20, 0x00, 0x00, 'A', FLAG_ZERO, 0, 0),
+                row("LDA neg", LDA_ABS.byte, 0x30, 0x00, 0x80, 'A', 0, FLAG_NEGATIVE, 0),
+                row("LDA clear", LDA_ABS.byte, 0x40, 0x00, 0x10, 'A', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-                row("LDX non-zero", LDX_ABS, 0x50, 0x00, 0x42, 'X', 0, 0, 0),
-                row("LDX zero", LDX_ABS, 0x60, 0x00, 0x00, 'X', FLAG_ZERO, 0, 0),
-                row("LDX neg", LDX_ABS, 0x70, 0x00, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
-                row("LDX clear", LDX_ABS, 0x80, 0x00, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDX non-zero", LDX_ABS.byte, 0x50, 0x00, 0x42, 'X', 0, 0, 0),
+                row("LDX zero", LDX_ABS.byte, 0x60, 0x00, 0x00, 'X', FLAG_ZERO, 0, 0),
+                row("LDX neg", LDX_ABS.byte, 0x70, 0x00, 0x80, 'X', 0, FLAG_NEGATIVE, 0),
+                row("LDX clear", LDX_ABS.byte, 0x80, 0x00, 0x10, 'X', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
 
-                row("LDY non-zero", LDY_ABS, 0x90, 0x00, 0x33, 'Y', 0, 0, 0),
-                row("LDY zero", LDY_ABS, 0xA0, 0x00, 0x00, 'Y', FLAG_ZERO, 0, 0),
-                row("LDY neg", LDY_ABS, 0xB0, 0x00, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
-                row("LDY clear", LDY_ABS, 0xC0, 0x00, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
+                row("LDY non-zero", LDY_ABS.byte, 0x90, 0x00, 0x33, 'Y', 0, 0, 0),
+                row("LDY zero", LDY_ABS.byte, 0xA0, 0x00, 0x00, 'Y', FLAG_ZERO, 0, 0),
+                row("LDY neg", LDY_ABS.byte, 0xB0, 0x00, 0x80, 'Y', 0, FLAG_NEGATIVE, 0),
+                row("LDY clear", LDY_ABS.byte, 0xC0, 0x00, 0x10, 'Y', 0, 0, FLAG_ZERO or FLAG_NEGATIVE),
             ) { _, opcode, lo, hi, memVal, target, expectedZ, expectedN, initialStatus ->
                 val absAddr = (hi shl 8) or lo
 
@@ -152,7 +153,7 @@ class CPUTest : FreeSpec({
                 val base = (hi shl 8) or lo
                 val eff = (base + xVal) and 0xFFFF
 
-                val cpu = setupCpuWithInstruction(LDA_ABX, lo, hi) // LDA abs,X
+                val cpu = setupCpuWithInstruction(LDA_ABX.byte, lo, hi) // LDA abs,X
                 cpu.memory.write(eff, memVal)                  // MemoryBus maps $0000-$1FFF to RAM
                 cpu.x = xVal
                 cpu.status = initialStatus
@@ -173,7 +174,7 @@ class CPUTest : FreeSpec({
             val base = (hi shl 8) or lo
             val eff = (base + xVal) and 0xFFFF
 
-            val cpu = setupCpuWithInstruction(LDA_ABX, lo, hi)
+            val cpu = setupCpuWithInstruction(LDA_ABX.byte, lo, hi)
             cpu.memory.write(eff, 0x2A)
             cpu.x = xVal
 
@@ -198,7 +199,7 @@ class CPUTest : FreeSpec({
                 val base = (hi shl 8) or lo
                 val eff = (base + yVal) and 0xFFFF
 
-                val cpu = setupCpuWithInstruction(LDA_ABY, lo, hi) // LDA abs,Y
+                val cpu = setupCpuWithInstruction(LDA_ABY.byte, lo, hi) // LDA abs,Y
                 cpu.memory.write(eff, memVal)
                 cpu.y = yVal
                 cpu.status = initialStatus
@@ -219,7 +220,7 @@ class CPUTest : FreeSpec({
             val base = (hi shl 8) or lo
             val eff = (base + yVal) and 0xFFFF
 
-            val cpu = setupCpuWithInstruction(LDA_ABY, lo, hi) // LDA abs,Y
+            val cpu = setupCpuWithInstruction(LDA_ABY.byte, lo, hi) // LDA abs,Y
             cpu.memory.write(eff, 0x2A)                     // writes to CPU RAM
             cpu.y = yVal
 
@@ -238,7 +239,7 @@ class CPUTest : FreeSpec({
 
         // LDA ($zp,X) — 0xA1 (always 6 cycles)
         "LDA (zp,X) loads via zp pointer; zero-page wrap on (zp+X)" {
-            val cpu = setupCpuWithInstruction(LDA_INX, 0x10)
+            val cpu = setupCpuWithInstruction(LDA_INX.byte,0x10)
             cpu.x = 0x04
 
             // pointer -> $10FF (RAM mirror region: $0000–$1FFF)
@@ -255,7 +256,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDA (zp,X) wraps (FF + X) low byte in zero page" {
-            val cpu = setupCpuWithInstruction(LDA_INX, 0xFF)
+            val cpu = setupCpuWithInstruction(LDA_INX.byte,0xFF)
             cpu.x = 0x02
 
             // pointer -> $1234 (also in RAM mirror region)
@@ -273,7 +274,7 @@ class CPUTest : FreeSpec({
 
         // LDA ($zp),Y — 0xB1 (5 base, +1 on page cross)
         "LDA (zp),Y loads without page cross (5 cycles)" {
-            val cpu = setupCpuWithInstruction(LDA_INY, 0x10)
+            val cpu = setupCpuWithInstruction(LDA_INY.byte,0x10)
             // base = $1000 (safe)
             write(cpu, 0x0010, 0x00)
             write(cpu, 0x0011, 0x10)
@@ -289,7 +290,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDA (zp),Y adds +1 cycle on page cross (6 cycles)" {
-            val cpu = setupCpuWithInstruction(LDA_INY, 0x10)
+            val cpu = setupCpuWithInstruction(LDA_INY.byte,0x10)
             // base = $10FF, Y=0x02 -> $1101 (cross from $10xx to $11xx)
             write(cpu, 0x0010, 0xFF)
             write(cpu, 0x0011, 0x10)
@@ -305,7 +306,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDA (zp),Y wraps high-byte fetch at zp=FF (no page cross → 5 cycles)" {
-            val cpu = setupCpuWithInstruction(LDA_INY, 0xFF)
+            val cpu = setupCpuWithInstruction(LDA_INY.byte,0xFF)
             // pointer at $00FF/$0000 -> $1234 (safe)
             write(cpu, 0x00FF, 0x34)
             write(cpu, 0x0000, 0x12)
@@ -327,7 +328,7 @@ class CPUTest : FreeSpec({
 
         // LDX $abs,Y — 0xBE (4 base, +1 on page cross)
         "LDX abs,Y loads without page cross (4 cycles)" {
-            val cpu = setupCpuWithInstruction(LDX_ABY, 0x00, 0x10) // $1000
+            val cpu = setupCpuWithInstruction(LDX_ABY.byte,0x00, 0x10) // $1000
             cpu.y = 0x0A
             write(cpu, 0x100A, 0x55)
 
@@ -340,7 +341,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDX abs,Y adds +1 cycle on page cross (5 cycles)" {
-            val cpu = setupCpuWithInstruction(LDX_ABY, 0xFF, 0x10) // base $10FF
+            val cpu = setupCpuWithInstruction(LDX_ABY.byte,0xFF, 0x10) // base $10FF
             cpu.y = 0x02 // -> $2101 (crosses $20xx -> $21xx)
             write(cpu, 0x1101, 0x80)
 
@@ -353,7 +354,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDX abs,Y sets ZERO when result is 0 (no page cross → 4 cycles)" {
-            val cpu = setupCpuWithInstruction(LDX_ABY, 0x10, 0x40) // $4010
+            val cpu = setupCpuWithInstruction(LDX_ABY.byte,0x10, 0x40) // $4010
             cpu.y = 0x00
             write(cpu, 0x4010, 0x00)
 
@@ -366,7 +367,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDX abs,Y reads from correct effective address (base + Y) (no page cross → 4 cycles)" {
-            val cpu = setupCpuWithInstruction(LDX_ABY, 0x34, 0x12) // base $1234
+            val cpu = setupCpuWithInstruction(LDX_ABY.byte,0x34, 0x12) // base $1234
             cpu.y = 0x10 // -> $1244
             write(cpu, 0x1234, 0x11)
             write(cpu, 0x1244, 0x2A)
@@ -380,7 +381,7 @@ class CPUTest : FreeSpec({
         }
 
         "LDX abs,Y wraps 16-bit effective address (FFFF + 1 -> 0000); page cross counts (+1) (5 cycles)" {
-            val cpu = setupCpuWithInstruction(LDX_ABY, 0xFF, 0xFF) // base $FFFF
+            val cpu = setupCpuWithInstruction(LDX_ABY.byte,0xFF, 0xFF) // base $FFFF
             cpu.y = 0x01 // -> $0000 (16-bit wrap)
             write(cpu, 0x0000, 0x2A)
 
@@ -404,25 +405,25 @@ class CPUTest : FreeSpec({
             // label, opcode, initialStatus, offset, startPC, expectTaken, expectCycles
 
             // --- BPL (branch if !N) / BMI (branch if N) ---
-            row("BPL not taken (N set)", BPL, FLAG_NEGATIVE, 0x05, 0x8000, false, 2),
-            row("BPL taken no cross", BPL, 0, 0x05, 0x8000, true, 3),
+            row("BPL not taken (N set)", BPL.byte, FLAG_NEGATIVE, 0x05, 0x8000, false, 2),
+            row("BPL taken no cross", BPL.byte, 0, 0x05, 0x8000, true, 3),
 
             // page-cross downward: nextPC=$8102, target=$80FC
-            row("BMI taken page cross", BMI, FLAG_NEGATIVE, 0xFA, 0x8100, true, 4),
+            row("BMI taken page cross", BMI.byte, FLAG_NEGATIVE, 0xFA, 0x8100, true, 4),
 
             // --- BEQ (branch if Z) / BNE (branch if !Z) ---
-            row("BEQ taken no cross", BEQ, FLAG_ZERO, 0x05, 0x8080, true, 3),
-            row("BNE not taken (Z set)", BNE, FLAG_ZERO, 0x20, 0x8090, false, 2),
+            row("BEQ taken no cross", BEQ.byte, FLAG_ZERO, 0x05, 0x8080, true, 3),
+            row("BNE not taken (Z set)", BNE.byte, FLAG_ZERO, 0x20, 0x8090, false, 2),
 
             // --- BCS (branch if C) / BCC (branch if !C) ---
-            row("BCS taken no cross", BCS, FLAG_CARRY, 0x01, 0x8100, true, 3),
+            row("BCS taken no cross", BCS.byte, FLAG_CARRY, 0x01, 0x8100, true, 3),
 
             // page-cross upward: nextPC=$80FF, target=$8100
-            row("BCC taken page cross", BCC, 0, 0x01, 0x80FD, true, 4),
+            row("BCC taken page cross", BCC.byte, 0, 0x01, 0x80FD, true, 4),
 
             // --- BVS (branch if V) / BVC (branch if !V) ---
-            row("BVS taken no cross", BVS, FLAG_OVERFLOW, 0x10, 0x80A0, true, 3),
-            row("BVC not taken (V set)", BVC, FLAG_OVERFLOW, 0x10, 0x80A0, false, 2),
+            row("BVS taken no cross", BVS.byte, FLAG_OVERFLOW, 0x10, 0x80A0, true, 3),
+            row("BVC not taken (V set)", BVC.byte, FLAG_OVERFLOW, 0x10, 0x80A0, false, 2),
         ) { label, opcode, initialStatus, offset, startPC, expectTaken, expectCycles ->
 
             val cpu = setupCpuWithInstruction(opcode, offset, address = startPC)
@@ -440,7 +441,7 @@ class CPUTest : FreeSpec({
     "STA absolute instruction" - {
         "should write A to a CPU RAM address and not touch flags" {
             // Program: 8D 42 00  (STA $0042)
-            val cpu = setupCpuWithInstruction(STA_ABS, 0x42, 0x00)
+            val cpu = setupCpuWithInstruction(STA_ABS.byte, 0x42, 0x00)
             cpu.a = 0xAB
             cpu.status = FLAG_ZERO or FLAG_NEGATIVE // pre-set some flags
 
@@ -472,19 +473,19 @@ class CPUTest : FreeSpec({
         "STA/ STX/ STY cover zp and indexed zp (wrap-around too)" {
             forAll(
                 // ---- STA ----
-                row(StoreCase("STA zp ($10)", STA_ZP, 0x10, null, 0x00, 'A', 0x42, 3)),
-                row(StoreCase("STA zp,X ($80 + X)", STA_ZPX, 0x80, 'X', 0x05, 'A', 0x7F, 4)),
-                row(StoreCase("STA zp,X wrap (FE+X)", STA_ZPX, 0xFE, 'X', 0x05, 'A', 0x99, 4)), // eff = 0x03
+                row(StoreCase("STA zp ($10)", STA_ZP.byte, 0x10, null, 0x00, 'A', 0x42, 3)),
+                row(StoreCase("STA zp,X ($80 + X)", STA_ZPX.byte, 0x80, 'X', 0x05, 'A', 0x7F, 4)),
+                row(StoreCase("STA zp,X wrap (FE+X)", STA_ZPX.byte, 0xFE, 'X', 0x05, 'A', 0x99, 4)), // eff = 0x03
 
                 // ---- STX ----
-                row(StoreCase("STX zp ($20)", STX_ZP, 0x20, null, 0x00, 'X', 0x33, 3)),
-                row(StoreCase("STX zp,Y ($40 + Y)", STX_ZPY, 0x40, 'Y', 0x0A, 'X', 0x55, 4)),
-                row(StoreCase("STX zp,Y wrap (FF+Y)", STX_ZPY, 0xFF, 'Y', 0x02, 'X', 0xAB, 4)), // eff = 0x01
+                row(StoreCase("STX zp ($20)", STX_ZP.byte, 0x20, null, 0x00, 'X', 0x33, 3)),
+                row(StoreCase("STX zp,Y ($40 + Y)", STX_ZPY.byte, 0x40, 'Y', 0x0A, 'X', 0x55, 4)),
+                row(StoreCase("STX zp,Y wrap (FF+Y)", STX_ZPY.byte, 0xFF, 'Y', 0x02, 'X', 0xAB, 4)), // eff = 0x01
 
                 // ---- STY ----
-                row(StoreCase("STY zp ($00)", STY_ZP, 0x00, null, 0x00, 'Y', 0x11, 3)),
-                row(StoreCase("STY zp,X ($7F + X)", STY_ZPX, 0x7F, 'X', 0x02, 'Y', 0xC4, 4)),
-                row(StoreCase("STY zp,X wrap (FD+X)", STY_ZPX, 0xFD, 'X', 0x07, 'Y', 0x80, 4))  // eff = 0x04
+                row(StoreCase("STY zp ($00)", STY_ZP.byte, 0x00, null, 0x00, 'Y', 0x11, 3)),
+                row(StoreCase("STY zp,X ($7F + X)", STY_ZPX.byte, 0x7F, 'X', 0x02, 'Y', 0xC4, 4)),
+                row(StoreCase("STY zp,X wrap (FD+X)", STY_ZPX.byte, 0xFD, 'X', 0x07, 'Y', 0x80, 4))  // eff = 0x04
             ) { tc ->
 
                 // Program: [opcode, baseZp]
@@ -531,7 +532,7 @@ class CPUTest : FreeSpec({
 
     "STA zero page instruction" - {
         "should store the accumulator into zero page memory" {
-            val cpu = setupCpuWithInstruction(STA_ZP, 0x10) // STA $10
+            val cpu = setupCpuWithInstruction(STA_ZP.byte,0x10) // STA $10
             cpu.a = 0x42
 
             val cycles = cpu.step()
@@ -541,7 +542,7 @@ class CPUTest : FreeSpec({
         }
 
         "should overwrite existing value in zero page" {
-            val cpu = setupCpuWithInstruction(STA_ZP, 0x80) // STA $80
+            val cpu = setupCpuWithInstruction(STA_ZP.byte,0x80) // STA $80
             cpu.memory.write(0x0080, 0x99) // existing value
             cpu.a = 0x55
 
@@ -554,7 +555,7 @@ class CPUTest : FreeSpec({
 
     "TXS instruction" - {
         "should transfer X to stack pointer without affecting flags" {
-            val cpu = setupCpuWithInstruction(TXS) // TXS opcode
+            val cpu = setupCpuWithInstruction(TXS.byte) // TXS opcode
             cpu.x = 0x42
             cpu.sp = 0x00
             val originalStatus = cpu.status
@@ -569,7 +570,7 @@ class CPUTest : FreeSpec({
 
     "TXA instruction" - {
         "should transfer X into A" {
-            val cpu = setupCpuWithInstruction(TXA) // TXA
+            val cpu = setupCpuWithInstruction(TXA.byte) // TXA
             cpu.x = 0x42
 
             val cycles = cpu.step()
@@ -581,7 +582,7 @@ class CPUTest : FreeSpec({
         }
 
         "should set ZERO flag when result is 0" {
-            val cpu = setupCpuWithInstruction(TXA)
+            val cpu = setupCpuWithInstruction(TXA.byte)
             cpu.x = 0x00
 
             val cycles = cpu.step()
@@ -593,7 +594,7 @@ class CPUTest : FreeSpec({
         }
 
         "should set NEGATIVE flag when bit 7 is set" {
-            val cpu = setupCpuWithInstruction(TXA)
+            val cpu = setupCpuWithInstruction(TXA.byte)
             cpu.x = 0x80
 
             val cycles = cpu.step()
@@ -607,7 +608,7 @@ class CPUTest : FreeSpec({
 
     "TYA instruction" - {
         "should transfer Y into A" {
-            val cpu = setupCpuWithInstruction(TYA) // TYA
+            val cpu = setupCpuWithInstruction(TYA.byte) // TYA
             cpu.y = 0x42
 
             val cycles = cpu.step()
@@ -619,7 +620,7 @@ class CPUTest : FreeSpec({
         }
 
         "should set ZERO flag when result is 0" {
-            val cpu = setupCpuWithInstruction(TYA)
+            val cpu = setupCpuWithInstruction(TYA.byte)
             cpu.y = 0x00
 
             val cycles = cpu.step()
@@ -631,7 +632,7 @@ class CPUTest : FreeSpec({
         }
 
         "should set NEGATIVE flag when bit 7 is set" {
-            val cpu = setupCpuWithInstruction(TYA)
+            val cpu = setupCpuWithInstruction(TYA.byte)
             cpu.y = 0x80
 
             val cycles = cpu.step()
@@ -657,55 +658,55 @@ class CPUTest : FreeSpec({
             // ----- A with CMP ($C9) -----
             row(
                 "A > M sets C, !Z, !N",
-                LDA_IMM, CMP_IMM, 'A', 0x42, 0x40, FLAG_CARRY, 0, 0
+                LDA_IMM.byte, CMP_IMM.byte, 'A', 0x42, 0x40, FLAG_CARRY, 0, 0
             ),
             row(
                 "A == M sets C and Z, !N",
-                LDA_IMM, CMP_IMM, 'A', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+                LDA_IMM.byte, CMP_IMM.byte, 'A', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
             ),
             row(
                 "A < M clears C/Z, sets N from (A-M)",
-                LDA_IMM, CMP_IMM, 'A', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+                LDA_IMM.byte, CMP_IMM.byte, 'A', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
             ),
             row(
                 "A borrow: 0x00-0x01 → 0xFF sets N, clears C/Z",
-                LDA_IMM, CMP_IMM, 'A', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+                LDA_IMM.byte, CMP_IMM.byte, 'A', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
             ),
 
             // ----- X with CPX ($E0) -----
             row(
                 "X > M sets C, !Z, !N",
-                LDX_IMM, CPX_IMM, 'X', 0x42, 0x40, FLAG_CARRY, 0, 0
+                LDX_IMM.byte, CPX_IMM.byte, 'X', 0x42, 0x40, FLAG_CARRY, 0, 0
             ),
             row(
                 "X == M sets C and Z, !N",
-                LDX_IMM, CPX_IMM, 'X', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+                LDX_IMM.byte, CPX_IMM.byte, 'X', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
             ),
             row(
                 "X < M clears C/Z, sets N",
-                LDX_IMM, CPX_IMM, 'X', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+                LDX_IMM.byte, CPX_IMM.byte, 'X', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
             ),
             row(
                 "X borrow: 0x00-0x01 → N, !C, !Z",
-                LDX_IMM, CPX_IMM, 'X', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+                LDX_IMM.byte, CPX_IMM.byte, 'X', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
             ),
 
             // ----- Y with CPY ($C0) -----
             row(
                 "Y > M sets C, !Z, !N",
-                LDY_IMM, CPY_IMM, 'Y', 0x42, 0x40, FLAG_CARRY, 0, 0
+                LDY_IMM.byte, CPY_IMM.byte, 'Y', 0x42, 0x40, FLAG_CARRY, 0, 0
             ),
             row(
                 "Y == M sets C and Z, !N",
-                LDY_IMM, CPY_IMM, 'Y', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
+                LDY_IMM.byte, CPY_IMM.byte, 'Y', 0x42, 0x42, FLAG_CARRY, FLAG_ZERO, 0
             ),
             row(
                 "Y < M clears C/Z, sets N",
-                LDY_IMM, CPY_IMM, 'Y', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
+                LDY_IMM.byte, CPY_IMM.byte, 'Y', 0x40, 0x42, 0, 0, FLAG_NEGATIVE
             ),
             row(
                 "Y borrow: 0x00-0x01 → N, !C, !Z",
-                LDY_IMM, CPY_IMM, 'Y', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
+                LDY_IMM.byte, CPY_IMM.byte, 'Y', 0x00, 0x01, 0, 0, FLAG_NEGATIVE
             ),
         ) { label, loadOp, cmpOp, reg, regVal, imm, expC, expZ, expN ->
 
@@ -749,23 +750,23 @@ class CPUTest : FreeSpec({
         "DEX/DEY/INX/INY behave correctly (wrap + Z/N flags)" {
             forAll(
                 // label, opcode, reg, start, expected, expectZ, expectN
-                row("DEX: dec 0x05 -> 0x04", DEX, 'X', 0x05, 0x04, 0, 0),
-                row("DEX: wrap 0x00 -> 0xFF", DEX, 'X', 0x00, 0xFF, 0, FLAG_NEGATIVE),
-                row("DEX: 0x01 -> 0x00 sets Z", DEX, 'X', 0x01, 0x00, FLAG_ZERO, 0),
-                row("DEX: 0x81 -> 0x80 sets N", DEX, 'X', 0x81, 0x80, 0, FLAG_NEGATIVE),
+                row("DEX: dec 0x05 -> 0x04", DEX.byte, 'X', 0x05, 0x04, 0, 0),
+                row("DEX: wrap 0x00 -> 0xFF", DEX.byte, 'X', 0x00, 0xFF, 0, FLAG_NEGATIVE),
+                row("DEX: 0x01 -> 0x00 sets Z", DEX.byte, 'X', 0x01, 0x00, FLAG_ZERO, 0),
+                row("DEX: 0x81 -> 0x80 sets N", DEX.byte, 'X', 0x81, 0x80, 0, FLAG_NEGATIVE),
 
-                row("DEY: dec 0x15 -> 0x14", DEY, 'Y', 0x15, 0x14, 0, 0),
-                row("DEY: wrap 0x00 -> 0xFF", DEY, 'Y', 0x00, 0xFF, 0, FLAG_NEGATIVE),
-                row("DEY: 0x01 -> 0x00 sets Z", DEY, 'Y', 0x01, 0x00, FLAG_ZERO, 0),
-                row("DEY: 0x81 -> 0x80 sets N", DEY, 'Y', 0x81, 0x80, 0, FLAG_NEGATIVE),
+                row("DEY: dec 0x15 -> 0x14", DEY.byte, 'Y', 0x15, 0x14, 0, 0),
+                row("DEY: wrap 0x00 -> 0xFF", DEY.byte, 'Y', 0x00, 0xFF, 0, FLAG_NEGATIVE),
+                row("DEY: 0x01 -> 0x00 sets Z", DEY.byte, 'Y', 0x01, 0x00, FLAG_ZERO, 0),
+                row("DEY: 0x81 -> 0x80 sets N", DEY.byte, 'Y', 0x81, 0x80, 0, FLAG_NEGATIVE),
 
-                row("INX: inc 0x05 -> 0x06", INX, 'X', 0x05, 0x06, 0, 0),
-                row("INX: wrap 0xFF -> 0x00 sets Z", INX, 'X', 0xFF, 0x00, FLAG_ZERO, 0),
-                row("INX: 0x7F -> 0x80 sets N", INX, 'X', 0x7F, 0x80, 0, FLAG_NEGATIVE),
+                row("INX: inc 0x05 -> 0x06", INX.byte, 'X', 0x05, 0x06, 0, 0),
+                row("INX: wrap 0xFF -> 0x00 sets Z", INX.byte, 'X', 0xFF, 0x00, FLAG_ZERO, 0),
+                row("INX: 0x7F -> 0x80 sets N", INX.byte, 'X', 0x7F, 0x80, 0, FLAG_NEGATIVE),
 
-                row("INY: inc 0x05 -> 0x06", INY, 'Y', 0x05, 0x06, 0, 0),
-                row("INY: wrap 0xFF -> 0x00 sets Z", INY, 'Y', 0xFF, 0x00, FLAG_ZERO, 0),
-                row("INY: 0x7F -> 0x80 sets N", INY, 'Y', 0x7F, 0x80, 0, FLAG_NEGATIVE),
+                row("INY: inc 0x05 -> 0x06", INY.byte, 'Y', 0x05, 0x06, 0, 0),
+                row("INY: wrap 0xFF -> 0x00 sets Z", INY.byte, 'Y', 0xFF, 0x00, FLAG_ZERO, 0),
+                row("INY: 0x7F -> 0x80 sets N", INY.byte, 'Y', 0x7F, 0x80, 0, FLAG_NEGATIVE),
             ) { label, opcode, reg, start, expected, expectZ, expectN ->
                 val cpu = setupCpuWithInstruction(opcode)
                 cpu.status = 0 // start clean
@@ -784,7 +785,7 @@ class CPUTest : FreeSpec({
     "JSR absolute" - {
         "pushes (PC-1) and jumps; 6 cycles" {
             // opcode at $8000, operand = $C123
-            val cpu = setupCpuWithInstruction(JSR, 0x23, 0xC1)
+            val cpu = setupCpuWithInstruction(JSR.byte, 0x23, 0xC1)
             cpu.sp = 0xFF
 
             val cycles = cpu.step()
@@ -803,7 +804,7 @@ class CPUTest : FreeSpec({
 
         "returns to the instruction after JSR; pulls two bytes; 6 cycles" {
             // Arrange: opcode RTS at $8000
-            val cpu = setupCpuWithInstruction(RTS)
+            val cpu = setupCpuWithInstruction(RTS.byte)
             // Simulate post-JSR stack: JSR pushed (PC-1) = $8002
             cpu.sp = 0xFD
             cpu.memory.write(0x01FE, 0x02)   // low byte
@@ -823,7 +824,7 @@ class CPUTest : FreeSpec({
         }
 
         "increments across page boundary (e.g., $80FF -> $8100)" {
-            val cpu = setupCpuWithInstruction(RTS)
+            val cpu = setupCpuWithInstruction(RTS.byte)
             cpu.sp = 0xFD
             // Return address on stack = $80FF; RTS should set PC to $8100
             cpu.memory.write(0x01FE, 0xFF)   // low
@@ -837,7 +838,7 @@ class CPUTest : FreeSpec({
         }
 
         "does not corrupt extra stack bytes (only two pulls)" {
-            val cpu = setupCpuWithInstruction(RTS)
+            val cpu = setupCpuWithInstruction(RTS.byte)
             cpu.sp = 0xFC
             // Stack layout:
             // 0x01FD : sentinel
@@ -860,7 +861,7 @@ class CPUTest : FreeSpec({
 
         "STA (indirect),Y stores A to (zp + Y) and takes 6 cycles" {
             val zp = 0x20
-            val cpu = setupCpuWithInstruction(STA_INY, zp)
+            val cpu = setupCpuWithInstruction(STA_INY.byte,zp)
             cpu.a = 0xAB
             cpu.y = 0x05
 
@@ -877,7 +878,7 @@ class CPUTest : FreeSpec({
 
         "STA (indirect),Y pointer wrap at $00FF/$0000" {
             val zp = 0xFF
-            val cpu = setupCpuWithInstruction(STA_INY, zp)
+            val cpu = setupCpuWithInstruction(STA_INY.byte,zp)
             cpu.a = 0x7E
             cpu.y = 0x01
 
@@ -894,7 +895,7 @@ class CPUTest : FreeSpec({
 
         "STA (indirect,X) uses pointer at (zp + X) & 0xFF; stores to $0205; 6 cycles" {
             val zp = 0x10
-            val cpu = setupCpuWithInstruction(STA_INX, zp)
+            val cpu = setupCpuWithInstruction(STA_INX.byte,zp)
             cpu.a = 0x55
             cpu.x = 0x0A
 
@@ -910,7 +911,7 @@ class CPUTest : FreeSpec({
 
         "STA (indirect,X) ZP wrap: (0xFE + 0x05) -> $0003/$0004 -> $0210" {
             val zp = 0xFE
-            val cpu = setupCpuWithInstruction(STA_INX, zp)
+            val cpu = setupCpuWithInstruction(STA_INX.byte,zp)
             cpu.a = 0x99
             cpu.x = 0x05
 
@@ -929,7 +930,7 @@ class CPUTest : FreeSpec({
 
         fun setup(aVal: Int, memVal: Int): Triple<CPU, Int, Int> {
             // Program: LDA #aVal ; BIT $1234
-            val cpu = setupCpuWithInstruction(LDA_IMM, aVal, BIT_ABS, 0x34, 0x12)
+            val cpu = setupCpuWithInstruction(LDA_IMM.byte, aVal, BIT_ABS.byte, 0x34, 0x12)
             cpu.memory.write(0x1234, memVal)
             val cycles = cpu.step() + cpu.step()
             return Triple(cpu, memVal, cycles)
@@ -978,7 +979,7 @@ class CPUTest : FreeSpec({
         suspend fun runCase(c: Case) {
             c.label {
                 // Program: LDA #aVal ; STA $hi$lo,index
-                val cpu = setupCpuWithInstruction(LDA_IMM, c.aVal, c.opcode, c.lo, c.hi)
+                val cpu = setupCpuWithInstruction(LDA_IMM.byte, c.aVal, c.opcode, c.lo, c.hi)
                 if (c.indexReg == 'X') cpu.x = c.indexVal else cpu.y = c.indexVal
 
                 val cycles = cpu.step() + cpu.step()
@@ -994,12 +995,12 @@ class CPUTest : FreeSpec({
 
         io.kotest.data.forAll(
             // -------- abs,X ----------
-            row(Case("abs,X no page cross", STA_ABX, 'X', 0x10, 0x10, 0x05, 0x3C)), // $1010 + 5 -> $2015
-            row(Case("abs,X page cross", STA_ABX, 'X', 0xFF, 0x10, 0x02, 0x7E)), // $10FF + 2 -> $2101
+            row(Case("abs,X no page cross", STA_ABX.byte, 'X', 0x10, 0x10, 0x05, 0x3C)), // $1010 + 5 -> $2015
+            row(Case("abs,X page cross", STA_ABX.byte, 'X', 0xFF, 0x10, 0x02, 0x7E)), // $10FF + 2 -> $2101
 
             // -------- abs,Y ----------
-            row(Case("abs,Y no page cross", STA_ABY, 'Y', 0x10, 0x10, 0x05, 0x55)), // $1010 + 5 -> $1015
-            row(Case("abs,Y page cross", STA_ABY, 'Y', 0xFF, 0x10, 0x02, 0xAA)), // $10FF + 2 -> $1101
+            row(Case("abs,Y no page cross", STA_ABY.byte, 'Y', 0x10, 0x10, 0x05, 0x55)), // $1010 + 5 -> $1015
+            row(Case("abs,Y page cross", STA_ABY.byte, 'Y', 0xFF, 0x10, 0x02, 0xAA)), // $10FF + 2 -> $1101
         ) { c -> runCase(c) }
     }
 
@@ -1014,12 +1015,12 @@ class CPUTest : FreeSpec({
             io.kotest.data.forAll(
                 // label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles
                 row(
-                    "Immediate ($09)", intArrayOf(ORA_IMM, 0b0000_1010),
+                    "Immediate ($09)", intArrayOf(ORA_IMM.byte, 0b0000_1010),
                     { cpu: CPU -> cpu.a = 0b0011_0000 },
                     0b0011_1010, 0, 0, 2
                 ),
                 row(
-                    "Zero Page ($05)", intArrayOf(ORA_ZP, 0x10),
+                    "Zero Page ($05)", intArrayOf(ORA_ZP.byte, 0x10),
                     { cpu: CPU ->
                         cpu.a = 0b0100_0000
                         write(cpu, 0x0010, 0b0000_1111)
@@ -1027,7 +1028,7 @@ class CPUTest : FreeSpec({
                     0b0100_1111, 0, 0, 3
                 ),
                 row(
-                    "Zero Page,X ($15)", intArrayOf(ORA_ZPX, 0x80),
+                    "Zero Page,X ($15)", intArrayOf(ORA_ZPX.byte, 0x80),
                     { cpu: CPU ->
                         cpu.a = 0b0000_0000
                         cpu.x = 0x05
@@ -1036,7 +1037,7 @@ class CPUTest : FreeSpec({
                     0b1000_0000, 0, FLAG_NEGATIVE, 4
                 ),
                 row(
-                    "Absolute ($0D)", intArrayOf(ORA_ABS, 0x34, 0x20), // $2034
+                    "Absolute ($0D)", intArrayOf(ORA_ABS.byte, 0x34, 0x20), // $2034
                     { cpu: CPU ->
                         cpu.a = 0b0000_0011
                         write(cpu, 0x2034, 0b0000_0000)
@@ -1044,7 +1045,7 @@ class CPUTest : FreeSpec({
                     0b0000_0011, 0, 0, 4
                 ),
                 row(
-                    "Absolute,X no cross ($1D)", intArrayOf(ORA_ABX, 0xF0, 0x00), // base $20F0
+                    "Absolute,X no cross ($1D)", intArrayOf(ORA_ABX.byte, 0xF0, 0x00), // base $20F0
                     { cpu: CPU ->
                         cpu.a = 0b0000_0011
                         cpu.x = 0x0E // eff $00FE (no cross)
@@ -1053,7 +1054,7 @@ class CPUTest : FreeSpec({
                     0b1111_0011, 0, FLAG_NEGATIVE, 4
                 ),
                 row(
-                    "Absolute,Y no cross ($19)", intArrayOf(ORA_ABY, 0xF0, 0x00), // base $20F0
+                    "Absolute,Y no cross ($19)", intArrayOf(ORA_ABY.byte, 0xF0, 0x00), // base $20F0
                     { cpu: CPU ->
                         cpu.a = 0
                         cpu.y = 0x0E // eff $00FE
@@ -1062,7 +1063,7 @@ class CPUTest : FreeSpec({
                     0, FLAG_ZERO, 0, 4
                 ),
                 row(
-                    "(Indirect,X) ($01)", intArrayOf(ORA_INX, 0x10),
+                    "(Indirect,X) ($01)", intArrayOf(ORA_INX.byte, 0x10),
                     { cpu: CPU ->
                         cpu.a = 0b0000_0101
                         cpu.x = 0x04
@@ -1074,7 +1075,7 @@ class CPUTest : FreeSpec({
                     0b1000_0101, 0, FLAG_NEGATIVE, 6
                 ),
                 row(
-                    "(Indirect),Y no cross ($11)", intArrayOf(ORA_INY, 0x20),
+                    "(Indirect),Y no cross ($11)", intArrayOf(ORA_INY.byte, 0x20),
                     { cpu: CPU ->
                         cpu.a = 0xFF
                         cpu.y = 0x00
@@ -1103,7 +1104,7 @@ class CPUTest : FreeSpec({
         "should add +1 cycle on page cross for Absolute,X and Absolute,Y" {
             // Absolute,X cross: base $00FF + X=0x05 -> $0104
             run {
-                val cpu = setupCpuWithInstruction(LDA_ABX, 0xFF, 0x00) // LDA abs,X
+                val cpu = setupCpuWithInstruction(LDA_ABX.byte, 0xFF, 0x00) // LDA abs,X
                 cpu.a = 0
                 cpu.x = 0x05
                 write(cpu, 0x0104, 0x01)
@@ -1117,7 +1118,7 @@ class CPUTest : FreeSpec({
             }
             // Absolute,Y cross: base $00FE + Y=0x02 -> $0100
             run {
-                val cpu = setupCpuWithInstruction(LDA_ABY, 0xFE, 0x00) // LDA abs,Y
+                val cpu = setupCpuWithInstruction(LDA_ABY.byte, 0xFE, 0x00) // LDA abs,Y
                 cpu.a = 0
                 cpu.y = 0x02
                 write(cpu, 0x0100, 0x80)
@@ -1134,7 +1135,7 @@ class CPUTest : FreeSpec({
         // 3) Page-cross penalty for (Indirect),Y
         "(Indirect),Y should add +1 cycle on page cross" {
             // Pointer at $0040/$0041 = $00FF; Y=+2 → eff $0101 (crosses $00xx → $01xx)
-            val cpu = setupCpuWithInstruction(ORA_INY, 0x40)
+            val cpu = setupCpuWithInstruction(ORA_INY.byte, 0x40)
             cpu.a = 0
             cpu.y = 0x02
             write(cpu, 0x0040, 0xFF) // lo
@@ -1161,12 +1162,12 @@ class CPUTest : FreeSpec({
                 // label, bytes, setup, expectedA, expectedZ, expectedN, expectedCycles
 
                 row(
-                    "Immediate ($29)", intArrayOf(AND_IMM, 0b0000_1111),
+                    "Immediate ($29)", intArrayOf(AND_IMM.byte, 0b0000_1111),
                     { cpu: CPU -> cpu.a = 0b0011_1010 },
                     0b0000_1010, 0, 0, 2
                 ),
                 row(
-                    "Zero Page ($25)", intArrayOf(AND_ZP, 0x10),
+                    "Zero Page ($25)", intArrayOf(AND_ZP.byte, 0x10),
                     { cpu: CPU ->
                         cpu.a = 0b0011_0011
                         write(cpu, 0x0010, 0b1111_0000)
@@ -1174,7 +1175,7 @@ class CPUTest : FreeSpec({
                     0b0011_0000, 0, 0, 3
                 ),
                 row(
-                    "Zero Page,X ($35)", intArrayOf(AND_ZPX, 0x80),
+                    "Zero Page,X ($35)", intArrayOf(AND_ZPX.byte, 0x80),
                     { cpu: CPU ->
                         cpu.a = 0xFF
                         cpu.x = 0x05
@@ -1183,7 +1184,7 @@ class CPUTest : FreeSpec({
                     0b1000_0000, 0, FLAG_NEGATIVE, 4
                 ),
                 row(
-                    "Absolute ($2D)", intArrayOf(AND_ABS, 0x34, 0x20), // $2034
+                    "Absolute ($2D)", intArrayOf(AND_ABS.byte, 0x34, 0x20), // $2034
                     { cpu: CPU ->
                         cpu.a = 0b0000_0011
                         write(cpu, 0x2034, 0b0000_0000)
@@ -1191,7 +1192,7 @@ class CPUTest : FreeSpec({
                     0b0000_0000, FLAG_ZERO, 0, 4
                 ),
                 row(
-                    "Absolute,X no cross ($3D)", intArrayOf(AND_ABX, 0xF0, 0x00), // base $00F0
+                    "Absolute,X no cross ($3D)", intArrayOf(AND_ABX.byte, 0xF0, 0x00), // base $00F0
                     { cpu: CPU ->
                         cpu.a = 0b1111_0011
                         cpu.x = 0x0E // eff $00FE (no cross)
@@ -1200,7 +1201,7 @@ class CPUTest : FreeSpec({
                     0b1111_0000, 0, FLAG_NEGATIVE, 4
                 ),
                 row(
-                    "Absolute,Y no cross ($39)", intArrayOf(AND_ABY, 0xF0, 0x00), // base $00F0
+                    "Absolute,Y no cross ($39)", intArrayOf(AND_ABY.byte, 0xF0, 0x00), // base $00F0
                     { cpu: CPU ->
                         cpu.a = 0xFF
                         cpu.y = 0x0E // eff $00FE
@@ -1209,7 +1210,7 @@ class CPUTest : FreeSpec({
                     0x00, FLAG_ZERO, 0, 4
                 ),
                 row(
-                    "(Indirect,X) ($21)", intArrayOf(AND_INX, 0x10),
+                    "(Indirect,X) ($21)", intArrayOf(AND_INX.byte, 0x10),
                     { cpu: CPU ->
                         cpu.a = 0xFF
                         cpu.x = 0x04
@@ -1221,7 +1222,7 @@ class CPUTest : FreeSpec({
                     0b1000_0000, 0, FLAG_NEGATIVE, 6
                 ),
                 row(
-                    "(Indirect),Y no cross ($31)", intArrayOf(AND_INY, 0x20),
+                    "(Indirect),Y no cross ($31)", intArrayOf(AND_INY.byte, 0x20),
                     { cpu: CPU ->
                         cpu.a = 0xFF
                         cpu.y = 0x00
@@ -1251,7 +1252,7 @@ class CPUTest : FreeSpec({
         "should add +1 cycle on page cross for Absolute,X and Absolute,Y" {
             // Absolute,X cross: base $00FF + X=0x05 -> $0104
             run {
-                val cpu = setupCpuWithInstruction(AND_ABX, 0xFF, 0x00) // AND abs,X
+                val cpu = setupCpuWithInstruction(AND_ABX.byte, 0xFF, 0x00) // AND abs,X
                 cpu.a = 0xFF
                 cpu.x = 0x05
                 write(cpu, 0x0104, 0x01)
@@ -1265,7 +1266,7 @@ class CPUTest : FreeSpec({
             }
             // Absolute,Y cross: base $00FE + Y=0x02 -> $0100
             run {
-                val cpu = setupCpuWithInstruction(AND_ABY, 0xFE, 0x00) // AND abs,Y
+                val cpu = setupCpuWithInstruction(AND_ABY.byte, 0xFE, 0x00) // AND abs,Y
                 cpu.a = 0xFF
                 cpu.y = 0x02
                 write(cpu, 0x0100, 0x80)
@@ -1282,7 +1283,7 @@ class CPUTest : FreeSpec({
         // 3) Page-cross penalty for (Indirect),Y
         "(Indirect),Y should add +1 cycle on page cross" {
             // Pointer at $0040/$0041 = $00FF; Y=+2 → eff $0101 (crosses $00xx → $01xx)
-            val cpu = setupCpuWithInstruction(AND_INY, 0x40) // AND (ind),Y
+            val cpu = setupCpuWithInstruction(AND_INY.byte, 0x40) // AND (ind),Y
             cpu.a = 0x7F
             cpu.y = 0x02
             write(cpu, 0x0040, 0xFF) // lo
@@ -1306,7 +1307,7 @@ class CPUTest : FreeSpec({
             val lo = target and 0xFF
             val hi = (target ushr 8) and 0xFF
 
-            val cpu = setupCpuWithInstruction(JMP_ABS, lo, hi)
+            val cpu = setupCpuWithInstruction(JMP_ABS.byte,lo, hi)
 
             val cycles = cpu.step()
 
@@ -1319,7 +1320,7 @@ class CPUTest : FreeSpec({
             val lo = target and 0xFF
             val hi = (target ushr 8) and 0xFF
 
-            val cpu = setupCpuWithInstruction(JMP_ABS, lo, hi)
+            val cpu = setupCpuWithInstruction(JMP_ABS.byte,lo, hi)
             // Seed flags with a non-trivial pattern
             val originalStatus = 0b1010_0101
             cpu.status = originalStatus
@@ -1339,7 +1340,7 @@ class CPUTest : FreeSpec({
             // Program: 6C <ptrLo> <ptrHi>
             val ptr = 0x1000
             val target = 0xC0DE
-            val cpu = setupCpuWithInstruction(JMP_IND, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+            val cpu = setupCpuWithInstruction(JMP_IND.byte,ptr and 0xFF, (ptr ushr 8) and 0xFF)
 
             // Pointer table at $3000 → low/high of target
             write(cpu, ptr, target and 0xFF)                 // [$3000] = DE
@@ -1354,7 +1355,7 @@ class CPUTest : FreeSpec({
         "should emulate the page-wrap bug when pointer ends in FF" {
             // Pointer = $03FF → high byte read from $0300 (same page), not $0400
             val ptr = 0x03FF
-            val cpu = setupCpuWithInstruction(JMP_IND, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+            val cpu = setupCpuWithInstruction(JMP_IND.byte,ptr and 0xFF, (ptr ushr 8) and 0xFF)
 
             // Place bytes to demonstrate the bug:
             // [$03FF] = 0x34 (low)
@@ -1373,7 +1374,7 @@ class CPUTest : FreeSpec({
         "should not modify processor flags" {
             val ptr = 0x1500
             val target = 0xBEEF
-            val cpu = setupCpuWithInstruction(JMP_IND, ptr and 0xFF, (ptr ushr 8) and 0xFF)
+            val cpu = setupCpuWithInstruction(JMP_IND.byte,ptr and 0xFF, (ptr ushr 8) and 0xFF)
             val originalStatus = 0b1101_0011
             cpu.status = originalStatus
 
@@ -1419,7 +1420,7 @@ class CPUTest : FreeSpec({
             row(
                 Case(
                     label = "INC ZP (E6 $10)",
-                    bytes = intArrayOf(INC_ZP, 0x10),
+                    bytes = intArrayOf(INC_ZP.byte, 0x10),
                     setup = { /* no-op */ },
                     effAddr = 0x0010,
                     startVal = 0x2A,
@@ -1432,7 +1433,7 @@ class CPUTest : FreeSpec({
             row(
                 Case(
                     label = "INC ZP,X (F6 \$F0) wraps to $10 with X=0x20",
-                    bytes = intArrayOf(INC_ZPX, 0xF0),
+                    bytes = intArrayOf(INC_ZPX.byte, 0xF0),
                     setup = { cpu -> cpu.x = 0x20 },
                     effAddr = 0x0010,
                     startVal = 0x7F,
@@ -1445,7 +1446,7 @@ class CPUTest : FreeSpec({
             row(
                 Case(
                     label = "INC ABS (EE $12 $00) -> $0012",
-                    bytes = intArrayOf(INC_ABS, 0x12, 0x00),
+                    bytes = intArrayOf(INC_ABS.byte, 0x12, 0x00),
                     setup = { /* no-op */ },
                     effAddr = 0x0012,
                     startVal = 0xFF,
@@ -1458,7 +1459,7 @@ class CPUTest : FreeSpec({
             row(
                 Case(
                     label = "INC ABS,X (FE \$FF $00) + X=0x05 -> $0104 (7 cycles)",
-                    bytes = intArrayOf(INC_ABX, 0xFF, 0x00),
+                    bytes = intArrayOf(INC_ABX.byte, 0xFF, 0x00),
                     setup = { cpu -> cpu.x = 0x05 },
                     effAddr = 0x0104,
                     startVal = 0x3C,
@@ -1498,7 +1499,7 @@ class CPUTest : FreeSpec({
 
         // LSR A — 0x4A (always 2 cycles)
         "LSR A shifts right; bit0 -> C; clears N; result non-zero (2 cycles)" {
-            val cpu = setupCpuWithInstruction(LSR_ACC)
+            val cpu = setupCpuWithInstruction(LSR_ACC.byte)
             cpu.a = 0b0000_0011 // 3 -> 1, carry=1
 
             val cycles = cpu.step()
@@ -1511,7 +1512,7 @@ class CPUTest : FreeSpec({
         }
 
         "LSR A sets ZERO when result is 0; carry from bit0 (2 cycles)" {
-            val cpu = setupCpuWithInstruction(LSR_ACC)
+            val cpu = setupCpuWithInstruction(LSR_ACC.byte)
             cpu.a = 0x01 // -> 0x00, carry=1
 
             val cycles = cpu.step()
@@ -1524,7 +1525,7 @@ class CPUTest : FreeSpec({
         }
 
         "LSR A clears C when bit0 was 0 (2 cycles)" {
-            val cpu = setupCpuWithInstruction(LSR_ACC)
+            val cpu = setupCpuWithInstruction(LSR_ACC.byte)
             cpu.a = 0x02 // 0b10 -> 0b1, carry=0
 
             val cycles = cpu.step()
@@ -1537,7 +1538,7 @@ class CPUTest : FreeSpec({
         }
 
         "LSR A always clears NEGATIVE even if A had bit7 set (2 cycles)" {
-            val cpu = setupCpuWithInstruction(LSR_ACC)
+            val cpu = setupCpuWithInstruction(LSR_ACC.byte)
             cpu.a = 0x80 // 0b1000_0000 -> 0b0100_0000, carry=0
 
             val cycles = cpu.step()
@@ -1550,7 +1551,7 @@ class CPUTest : FreeSpec({
         }
 
         "LSR A produces correct result for an odd value: floor(A/2); remainder in C (2 cycles)" {
-            val cpu = setupCpuWithInstruction(LSR_ACC)
+            val cpu = setupCpuWithInstruction(LSR_ACC.byte)
             cpu.a = 0xFF // 255 -> 127, carry=1
 
             val cycles = cpu.step()
@@ -1567,7 +1568,7 @@ class CPUTest : FreeSpec({
 
         // TAX — 0xAA (always 2 cycles)
         "TAX copies A into X and sets N/Z correctly (2 cycles)" {
-            val cpu = setupCpuWithInstruction(TAX)
+            val cpu = setupCpuWithInstruction(TAX.byte)
             cpu.a = 0x80
 
             val cycles = cpu.step()
@@ -1585,7 +1586,7 @@ class CPUTest : FreeSpec({
 
         // PHA — 0x48 (always 3 cycles)
         "PHA pushes A onto stack; SP decremented; flags unchanged (3 cycles)" {
-            val cpu = setupCpuWithInstruction(PHA)
+            val cpu = setupCpuWithInstruction(PHA.byte)
             cpu.a = 0x42
             cpu.sp = 0xFD
             val statusBefore = cpu.status
@@ -1609,7 +1610,7 @@ class CPUTest : FreeSpec({
 
         // PLA — 0x68 (always 4 cycles)
         "PLA pulls value into A; SP incremented; sets N/Z; other flags unchanged (4 cycles)" {
-            val cpu = setupCpuWithInstruction(PLA)
+            val cpu = setupCpuWithInstruction(PLA.byte)
 
             // Stack setup: value will be pulled from $01FD
             cpu.sp = 0xFC

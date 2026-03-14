@@ -273,8 +273,8 @@ class CpuSetup {
     }
 }
 
-class Instruction(val opcode: Int, vararg val operands: Int) {
-    val bytes = intArrayOf(opcode) + operands
+class Instruction(val opcode: Opcode, vararg val operands: Int) {
+    val bytes = intArrayOf(opcode.byte) + operands
     val size = 1 + operands.size
 }
 

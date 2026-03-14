@@ -1,6 +1,7 @@
 package nestor
 
 import io.kotest.core.spec.style.FreeSpec
+import nestor.Opcode.*
 
 class CPUInstructionTest : FreeSpec({
 
