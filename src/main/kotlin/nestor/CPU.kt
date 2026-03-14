@@ -101,9 +101,11 @@ class CPU(
         // STX
         Opcode.STX_ZP  -> stxZeroPage()
         Opcode.STX_ZPY -> stxZeroPageY()
+        Opcode.STX_ABS -> stxAbsolute()
         // STY
         Opcode.STY_ZP  -> styZeroPage()
         Opcode.STY_ZPX -> styZeroPageX()
+        Opcode.STY_ABS -> styAbsolute()
         // Transfer
         Opcode.TAX -> tax()
         Opcode.TAY -> tay()
@@ -352,10 +354,12 @@ class CPU(
     // STX
     private fun stxZeroPage()  = 3.also { memory.write(addrZeroPage(), x) }
     private fun stxZeroPageY() = 4.also { memory.write(addrZeroPageI(y), x) }
+    private fun stxAbsolute()  = 4.also { memory.write(addrAbsolute(), x) }
 
     // STY
     private fun styZeroPage()  = 3.also { memory.write(addrZeroPage(), y) }
     private fun styZeroPageX() = 4.also { memory.write(addrZeroPageI(x), y) }
+    private fun styAbsolute()  = 4.also { memory.write(addrAbsolute(), y) }
 
     // Transfer
     private fun tax() = 2.also {
