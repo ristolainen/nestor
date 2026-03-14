@@ -76,6 +76,15 @@ Saved reference docs live in `.claude/reference/` — read these when implementi
 
 We develop test-driven: write all tests for new behaviour first, verify they fail, then implement.
 
+### Adding a missing CPU instruction
+
+1. `./gradlew run` — run the emulator and note the unimplemented opcode it stops on
+2. Check `CPUInstructionTest.kt` for existing tests for that instruction
+3. If none exist, write tests covering all addressing modes and edge cases first
+4. Run the tests and confirm they all fail
+5. Implement the instruction in `CPU.kt` (dispatch + function body)
+6. Run the tests again and confirm they all pass
+
 ## Coding Style
 
 - Idiomatic Kotlin: prefer `when` expressions over `if-else`, prefer expression bodies over block bodies
