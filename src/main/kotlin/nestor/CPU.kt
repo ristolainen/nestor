@@ -78,6 +78,8 @@ class CPU(
     private fun decodeAndExecute(opcode: Opcode) = when (opcode) {
         // LDA
         Opcode.LDA_IMM -> ldaImmediate()
+        Opcode.LDA_ZP  -> ldaZeroPage()
+        Opcode.LDA_ZPX -> ldaZeroPageX()
         Opcode.LDA_ABS -> ldaAbsolute()
         Opcode.LDA_ABX -> ldaAbsoluteX()
         Opcode.LDA_ABY -> ldaAbsoluteY()
@@ -85,11 +87,16 @@ class CPU(
         Opcode.LDA_INY -> ldaIndirectY()
         // LDX
         Opcode.LDX_IMM -> ldxImmediate()
+        Opcode.LDX_ZP  -> ldxZeroPage()
+        Opcode.LDX_ZPY -> ldxZeroPageY()
         Opcode.LDX_ABS -> ldxAbsolute()
         Opcode.LDX_ABY -> ldxAbsoluteY()
         // LDY
         Opcode.LDY_IMM -> ldyImmediate()
+        Opcode.LDY_ZP  -> ldyZeroPage()
+        Opcode.LDY_ZPX -> ldyZeroPageX()
         Opcode.LDY_ABS -> ldyAbsolute()
+        Opcode.LDY_ABX -> ldyAbsoluteX()
         // STA
         Opcode.STA_ZP  -> staZeroPage()
         Opcode.STA_ZPX -> staZeroPageX()
@@ -116,6 +123,8 @@ class CPU(
         // Stack
         Opcode.PHA -> pha()
         Opcode.PLA -> pla()
+        Opcode.PHP -> php()
+        Opcode.PLP -> plp()
         // EOR
         Opcode.EOR_IMM -> eorImmediate()
         Opcode.EOR_ZP  -> eorZeroPage()
@@ -189,8 +198,19 @@ class CPU(
         Opcode.SBC_INY -> sbcIndirectY()
         // Compare
         Opcode.CMP_IMM -> cmpImmediate()
+        Opcode.CMP_ZP  -> cmpZeroPage()
+        Opcode.CMP_ZPX -> cmpZeroPageX()
+        Opcode.CMP_ABS -> cmpAbsolute()
+        Opcode.CMP_ABX -> cmpAbsoluteX()
+        Opcode.CMP_ABY -> cmpAbsoluteY()
+        Opcode.CMP_INX -> cmpIndirectX()
+        Opcode.CMP_INY -> cmpIndirectY()
         Opcode.CPX_IMM -> cpxImmediate()
+        Opcode.CPX_ZP  -> cpxZeroPage()
+        Opcode.CPX_ABS -> cpxAbsolute()
         Opcode.CPY_IMM -> cpyImmediate()
+        Opcode.CPY_ZP  -> cpyZeroPage()
+        Opcode.CPY_ABS -> cpyAbsolute()
         // Branch
         Opcode.BPL -> bpl()
         Opcode.BMI -> bmi()
@@ -278,6 +298,16 @@ class CPU(
         setZN(a)
     }
 
+    private fun ldaZeroPage() = 3.also {
+        a = memory.read(addrZeroPage())
+        setZN(a)
+    }
+
+    private fun ldaZeroPageX() = 4.also {
+        a = memory.read(addrZeroPageI(x))
+        setZN(a)
+    }
+
     private fun ldaAbsolute() = 4.also {
         a = memory.read(addrAbsolute())
         setZN(a)
@@ -315,6 +345,16 @@ class CPU(
         setZN(x)
     }
 
+    private fun ldxZeroPage() = 3.also {
+        x = memory.read(addrZeroPage())
+        setZN(x)
+    }
+
+    private fun ldxZeroPageY() = 4.also {
+        x = memory.read(addrZeroPageI(y))
+        setZN(x)
+    }
+
     private fun ldxAbsolute() = 4.also {
         x = memory.read(addrAbsolute())
         setZN(x)
@@ -333,9 +373,26 @@ class CPU(
         setZN(y)
     }
 
+    private fun ldyZeroPage() = 3.also {
+        y = memory.read(addrZeroPage())
+        setZN(y)
+    }
+
+    private fun ldyZeroPageX() = 4.also {
+        y = memory.read(addrZeroPageI(x))
+        setZN(y)
+    }
+
     private fun ldyAbsolute() = 4.also {
         y = memory.read(addrAbsolute())
         setZN(y)
+    }
+
+    private fun ldyAbsoluteX(): Int {
+        val (v, extra) = readAbsoluteI(x)
+        y = v
+        setZN(y)
+        return 4 + extra
     }
 
     // STA
@@ -396,6 +453,10 @@ class CPU(
         a = pull()
         setZN(a)
     }
+
+    private fun php() = 3.also { push(status or 0x30) }
+
+    private fun plp() = 4.also { status = (pull() and 0xEF) or 0x20 }
 
     // AND
     private fun andImmediate() = 2.also {
@@ -713,11 +774,37 @@ class CPU(
 
     // Compare
     private fun cmpImmediate() = cmImmediate(a)
-    private fun cpxImmediate() = cmImmediate(x)
-    private fun cpyImmediate() = cmImmediate(y)
+    private fun cmpZeroPage()  = cmZeroPage(a)
+    private fun cmpZeroPageX() = cmZeroPageX(a)
+    private fun cmpAbsolute()  = cmAbsolute(a)
+    private fun cmpAbsoluteX() = cmAbsoluteI(a, x)
+    private fun cmpAbsoluteY() = cmAbsoluteI(a, y)
+    private fun cmpIndirectX() = 6.also { cm(a, memory.read(addrIndirectX())) }
+    private fun cmpIndirectY(): Int {
+        val (v, extra) = readIndirectY()
+        cm(a, v)
+        return 5 + extra
+    }
 
-    private fun cmImmediate(reg: Int) = 2.also {
-        val v = readNextByte()
+    private fun cpxImmediate() = cmImmediate(x)
+    private fun cpxZeroPage()  = cmZeroPage(x)
+    private fun cpxAbsolute()  = cmAbsolute(x)
+
+    private fun cpyImmediate() = cmImmediate(y)
+    private fun cpyZeroPage()  = cmZeroPage(y)
+    private fun cpyAbsolute()  = cmAbsolute(y)
+
+    private fun cmImmediate(reg: Int) = 2.also { cm(reg, readNextByte()) }
+    private fun cmZeroPage(reg: Int)  = 3.also { cm(reg, memory.read(addrZeroPage())) }
+    private fun cmZeroPageX(reg: Int) = 4.also { cm(reg, memory.read(addrZeroPageI(x))) }
+    private fun cmAbsolute(reg: Int)  = 4.also { cm(reg, memory.read(addrAbsolute())) }
+    private fun cmAbsoluteI(reg: Int, index: Int): Int {
+        val (v, extra) = readAbsoluteI(index)
+        cm(reg, v)
+        return 4 + extra
+    }
+
+    private fun cm(reg: Int, v: Int) {
         val diff = (reg - v).to8bits()
         setFlag(reg >= v, FLAG_CARRY)
         setFlag(diff == 0, FLAG_ZERO)
