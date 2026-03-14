@@ -135,6 +135,12 @@ class CPU(
         Opcode.BIT_ABS -> bitAbsolute()
         // Shift
         Opcode.LSR_ACC -> lsrAccumulator()
+        // ROL
+        Opcode.ROL_ACC -> rolAccumulator()
+        Opcode.ROL_ZP  -> rolZeroPage()
+        Opcode.ROL_ZPX -> rolZeroPageX()
+        Opcode.ROL_ABS -> rolAbsolute()
+        Opcode.ROL_ABX -> rolAbsoluteX()
         // Compare
         Opcode.CMP_IMM -> cmpImmediate()
         Opcode.CPX_IMM -> cpxImmediate()
@@ -438,6 +444,30 @@ class CPU(
         setFlag(carry != 0, FLAG_CARRY)
         setFlag(shifted == 0, FLAG_ZERO)
         clearStatusFlag(FLAG_NEGATIVE)
+    }
+
+    // ROL
+    private fun rolAccumulator() = 2.also {
+        val result = rotateLeft(a)
+        a = result
+    }
+    private fun rolZeroPage()  = 5.also { rotateLeftMemory(addrZeroPage()) }
+    private fun rolZeroPageX() = 6.also { rotateLeftMemory(addrZeroPageI(x)) }
+    private fun rolAbsolute()  = 6.also { rotateLeftMemory(addrAbsolute()) }
+    private fun rolAbsoluteX() = 7.also { rotateLeftMemory(addrAbsoluteI(x)) }
+
+    private fun rotateLeft(v: Int): Int {
+        val carryIn = if (cSet()) 1 else 0
+        val result = ((v shl 1) or carryIn) and 0xFF
+        setFlag((v and 0x80) != 0, FLAG_CARRY)
+        setZN(result)
+        return result
+    }
+
+    private fun rotateLeftMemory(addr: Int) {
+        val v = memory.read(addr)
+        memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
+        memory.write(addr, rotateLeft(v))
     }
 
     // Compare

@@ -481,6 +481,94 @@ class CPUInstructionTest : FreeSpec({
         )
     }
 
+    // ── ROL ──────────────────────────────────────────────────────────────
+    // ROL: result = (value << 1) | old_carry. C = old bit 7. N, Z from result.
+    "ROL accumulator" - {
+        testStep(
+            "shifts left, carry in clears, carry out clears",
+            Instruction(ROL_ACC),
+            CpuSetup()
+                .a(0x40),
+            ExpectedStepOutcome(cycles = 2, a = 0x80, carry = false, zero = false, negative = true)
+        )
+        testStep(
+            "carry in rotates into bit 0",
+            Instruction(ROL_ACC),
+            CpuSetup()
+                .a(0x40)
+                .carry(true),
+            ExpectedStepOutcome(cycles = 2, a = 0x81, carry = false, zero = false, negative = true)
+        )
+        testStep(
+            "old bit 7 goes to carry",
+            Instruction(ROL_ACC),
+            CpuSetup()
+                .a(0x81),
+            ExpectedStepOutcome(cycles = 2, a = 0x02, carry = true, zero = false, negative = false)
+        )
+        testStep(
+            "result zero",
+            Instruction(ROL_ACC),
+            CpuSetup()
+                .a(0x80),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, carry = true, zero = true, negative = false)
+        )
+    }
+    "ROL zero page" - {
+        testStep(
+            "rotates memory value",
+            Instruction(ROL_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x40),
+            ExpectedStepOutcome(cycles = 5, carry = false, zero = false, negative = true, mem = mapOf(0x10 to 0x80))
+        )
+        testStep(
+            "carry in sets bit 0",
+            Instruction(ROL_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x00)
+                .carry(true),
+            ExpectedStepOutcome(cycles = 5, carry = false, zero = false, negative = false, mem = mapOf(0x10 to 0x01))
+        )
+    }
+    "ROL zero page,X" - {
+        testStep(
+            "indexed rotate",
+            Instruction(ROL_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x14 to 0x80))
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(ROL_ZPX, 0xFF),
+            CpuSetup()
+                .x(0x02)
+                .mem(0x01, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x01 to 0x80))
+        )
+    }
+    "ROL absolute" - {
+        testStep(
+            "rotates at 16-bit address",
+            Instruction(ROL_ABS, 0x00, 0x02),
+            CpuSetup()
+                .mem(0x0200, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x0200 to 0x80))
+        )
+    }
+    "ROL absolute,X" - {
+        testStep(
+            "always 7 cycles RMW",
+            Instruction(ROL_ABX, 0x00, 0x02),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0201, 0x40),
+            ExpectedStepOutcome(cycles = 7, carry = false, zero = false, negative = true, mem = mapOf(0x0201 to 0x80))
+        )
+    }
+
     // ── LDA ──────────────────────────────────────────────────────────────
     "LDA immediate" - {
         testStep(

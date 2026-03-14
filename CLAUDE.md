@@ -72,6 +72,10 @@ Saved reference docs live in `.claude/reference/` — read these when implementi
 - `ref_cycle_timing.md` — CPU/PPU cycles per scanline/frame, master clock, key timing landmarks
 - `ref_trace_format.md` — CPU/PPU trace line format, field meanings, and how to diagnose divergences
 
+## Development Approach
+
+We develop test-driven: write all tests for new behaviour first, verify they fail, then implement.
+
 ## Coding Style
 
 - Idiomatic Kotlin: prefer `when` expressions over `if-else`, prefer expression bodies over block bodies
