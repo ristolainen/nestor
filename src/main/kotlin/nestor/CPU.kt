@@ -169,6 +169,7 @@ class CPU(
         Opcode.JSR -> jsr()
         Opcode.RTS -> rts()
         // Flags
+        Opcode.SEC -> sec()
         Opcode.SEI -> sei()
         Opcode.CLD -> cld()
         // Misc
@@ -554,6 +555,7 @@ class CPU(
     }
 
     // Flags
+    private fun sec() = 2.also { setStatusFlag(FLAG_CARRY) }
     private fun sei() = 2.also { setStatusFlag(FLAG_INTERRUPT_DISABLE) }
     private fun cld() = 2.also { clearStatusFlag(FLAG_DECIMAL) }
 
