@@ -56,3 +56,9 @@ val nativeDir = when {
 tasks.withType<JavaExec> {
     jvmArgs = listOf("-Djava.library.path=$projectDir/libs/$nativeDir")
 }
+
+tasks.named("clean") {
+    doLast {
+        fileTree(mapOf("dir" to "traces", "include" to "*.txt")).forEach { it.delete() }
+    }
+}
