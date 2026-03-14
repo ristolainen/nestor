@@ -168,6 +168,10 @@ class CPU(
         Opcode.INC_ZPX -> incZeroPageX()
         Opcode.INC_ABS -> incAbsolute()
         Opcode.INC_ABX -> incAbsoluteX()
+        Opcode.DEC_ZP  -> decZeroPage()
+        Opcode.DEC_ZPX -> decZeroPageX()
+        Opcode.DEC_ABS -> decAbsolute()
+        Opcode.DEC_ABX -> decAbsoluteX()
         Opcode.INX -> inx()
         Opcode.INY -> iny()
         Opcode.DEX -> dex()
@@ -550,6 +554,19 @@ class CPU(
         val v = memory.read(addr)
         memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
         val nv = (v + 1).to8bits()
+        memory.write(addr, nv)
+        setZN(nv)
+    }
+
+    private fun decZeroPage()  = 5.also { decrementMemory(addrZeroPage()) }
+    private fun decZeroPageX() = 6.also { decrementMemory(addrZeroPageI(x)) }
+    private fun decAbsolute()  = 6.also { decrementMemory(addrAbsolute()) }
+    private fun decAbsoluteX() = 7.also { decrementMemory(addrAbsoluteI(x)) }
+
+    private fun decrementMemory(addr: Int) {
+        val v = memory.read(addr)
+        memory.write(addr, v) // 6502 RMW: write original byte back before writing modified value
+        val nv = (v - 1).to8bits()
         memory.write(addr, nv)
         setZN(nv)
     }
