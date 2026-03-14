@@ -23,16 +23,23 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 - [x] Implement CPU instruction fetch/decode loop
 - [x] Support basic 6502 opcodes:
     - [x] NOP, LDA, STA, JMP, JSR, RTS
-    - [x] INC/DEC (INC, DEC, INX, INY, DEX, DEY)
+    - [x] INC (all modes), INX, INY, DEX, DEY
     - [x] All branch instructions (BEQ, BNE, BCS, BCC, BVS, BVC, BMI, BPL)
     - [x] All bitwise OR / AND / BIT instructions
-    - [x] Transfer instructions (TAX, TAY, TXA, TYA, TXS, TSX)
-    - [x] Compare instructions (CMP, CPX, CPY)
+    - [x] Transfer instructions (TAX, TXA, TYA, TXS)
     - [x] Stack instructions (PHA, PLA)
     - [x] LSR accumulator
+    - [x] Flag ops: SEI, CLD
+    - [ ] DEC (all modes)
+    - [ ] TAY, TSX
+    - [ ] PHP, PLP
+    - [ ] Flag ops: CLC, SEC, CLI, CLV, SED
+    - [ ] CMP/CPX/CPY — non-immediate addressing modes (ZP, ABS, indexed, indirect)
+    - [ ] LDA/LDX/LDY — zero-page addressing modes
+    - [ ] STX absolute, STY absolute
+    - [ ] ASL (all modes), LSR memory modes (ZP, ZPX, ABS, ABX)
     - [ ] Arithmetic ops (ADC, SBC)
-    - [ ] Shift/rotate (ROL, ROR, ASL, LSR memory modes)
-    - [ ] Remaining addressing mode gaps
+    - [ ] Shift/rotate (ROL, ROR)
 - [x] Hook up memory bus (read/write logic)
 - [ ] Implement I/O register stubs (PPU, input)
 - [x] Tie CPU and PPU timing (3 PPU cycles per CPU cycle)
@@ -110,7 +117,7 @@ A detailed, trackable checklist for building the Nestor NES emulator in Kotlin.
 - [ ] Scanline-accurate PPU rendering — replace batch `renderFrame()` with per-scanline rendering driven by `tick()`, so mid-frame scroll writes (e.g. SMB HUD split) work correctly
 - [ ] Log unknown opcodes — `else` branch in CPU decode should throw/log instead of silently corrupting state
 - [ ] Give PPU its own address bus — replace pre-parsed tile list with a PPU bus ($0000–$3FFF); required for CHR-RAM and any mapper beyond NROM
-- [ ] Replace reflection in `Trace.kt` — use `CpuState`/`PpuState` data class snapshots instead of Java reflection, so tracing doesn't break silently on renames
+- [x] Replace reflection in `Trace.kt` — use `CpuState`/`PpuState` data class snapshots instead of Java reflection, so tracing doesn't break silently on renames
 - [ ] Implement IRQ — wire IRQ into CPU interrupt poll alongside NMI; needed for DMC audio, MMC3 timing, and `BRK` (requires `PHP`/`PLP`/`RTI` first)
 
 ---
