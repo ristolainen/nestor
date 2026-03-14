@@ -191,7 +191,11 @@ class CPU(
         Opcode.JSR -> jsr()
         Opcode.RTS -> rts()
         // Flags
+        Opcode.CLC -> clc()
+        Opcode.CLI -> cli()
+        Opcode.CLV -> clv()
         Opcode.SEC -> sec()
+        Opcode.SED -> sed()
         Opcode.SEI -> sei()
         Opcode.CLD -> cld()
         // Misc
@@ -674,7 +678,11 @@ class CPU(
     }
 
     // Flags
+    private fun clc() = 2.also { clearStatusFlag(FLAG_CARRY) }
+    private fun cli() = 2.also { clearStatusFlag(FLAG_INTERRUPT_DISABLE) }
+    private fun clv() = 2.also { clearStatusFlag(FLAG_OVERFLOW) }
     private fun sec() = 2.also { setStatusFlag(FLAG_CARRY) }
+    private fun sed() = 2.also { setStatusFlag(FLAG_DECIMAL) }
     private fun sei() = 2.also { setStatusFlag(FLAG_INTERRUPT_DISABLE) }
     private fun cld() = 2.also { clearStatusFlag(FLAG_DECIMAL) }
 
