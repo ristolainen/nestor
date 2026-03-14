@@ -106,9 +106,11 @@ class CPU(
         Opcode.STY_ZPX -> styZeroPageX()
         // Transfer
         Opcode.TAX -> tax()
+        Opcode.TAY -> tay()
         Opcode.TXA -> txa()
         Opcode.TYA -> tya()
         Opcode.TXS -> txs()
+        Opcode.TSX -> tsx()
         // Stack
         Opcode.PHA -> pha()
         Opcode.PLA -> pla()
@@ -362,7 +364,17 @@ class CPU(
         setZN(a)
     }
 
+    private fun tay() = 2.also {
+        y = a
+        setZN(y)
+    }
+
     private fun txs() = 2.also { sp = x }
+
+    private fun tsx() = 2.also {
+        x = sp
+        setZN(x)
+    }
 
     // Stack
     private fun pha() = 3.also { push(a) }
