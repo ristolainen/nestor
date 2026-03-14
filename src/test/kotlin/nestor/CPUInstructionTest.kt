@@ -306,6 +306,14 @@ class CPUInstructionTest : FreeSpec({
                 .mem(0x0200, 0xFF),
             ExpectedStepOutcome(cycles = 4, zero = true, negative = true, overflow = true)
         )
+        testStep(
+            "Z clear when A AND M is non-zero",
+            Instruction(BIT_ABS, 0x00, 0x02),
+            CpuSetup()
+                .a(0x0F)
+                .mem(0x0200, 0x0F),
+            ExpectedStepOutcome(cycles = 4, zero = false, negative = false, overflow = false)
+        )
     }
 
     // ── LSR ──────────────────────────────────────────────────────────────
@@ -331,6 +339,145 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .a(0x01),
             ExpectedStepOutcome(cycles = 2, a = 0x00, carry = true, zero = true, negative = false)
+        )
+    }
+    "LSR zero page" - {
+        testStep(
+            "shifts right carry set",
+            Instruction(LSR_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x03),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = false, negative = false, mem = mapOf(0x10 to 0x01))
+        )
+        testStep(
+            "even value carry clear",
+            Instruction(LSR_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x80),
+            ExpectedStepOutcome(cycles = 5, carry = false, zero = false, negative = false, mem = mapOf(0x10 to 0x40))
+        )
+        testStep(
+            "result zero",
+            Instruction(LSR_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x01),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = true, negative = false, mem = mapOf(0x10 to 0x00))
+        )
+    }
+    "LSR zero page,X" - {
+        testStep(
+            "indexed shift",
+            Instruction(LSR_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x03),
+            ExpectedStepOutcome(cycles = 6, carry = true, zero = false, negative = false, mem = mapOf(0x14 to 0x01))
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(LSR_ZPX, 0xFF),
+            CpuSetup()
+                .x(0x02)
+                .mem(0x01, 0x03),
+            ExpectedStepOutcome(cycles = 6, carry = true, zero = false, negative = false, mem = mapOf(0x01 to 0x01))
+        )
+    }
+    "LSR absolute" - {
+        testStep(
+            "shifts at 16-bit address",
+            Instruction(LSR_ABS, 0x00, 0x02),
+            CpuSetup()
+                .mem(0x0200, 0x03),
+            ExpectedStepOutcome(cycles = 6, carry = true, zero = false, negative = false, mem = mapOf(0x0200 to 0x01))
+        )
+    }
+    "LSR absolute,X" - {
+        testStep(
+            "always 7 cycles RMW",
+            Instruction(LSR_ABX, 0x00, 0x02),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0201, 0x03),
+            ExpectedStepOutcome(cycles = 7, carry = true, zero = false, negative = false, mem = mapOf(0x0201 to 0x01))
+        )
+    }
+
+    // ── ASL ──────────────────────────────────────────────────────────────
+    // ASL: C = old bit 7, shift left by 1. N = bit 7 of result, Z = result is zero.
+    "ASL accumulator" - {
+        testStep(
+            "shifts left no carry",
+            Instruction(ASL_ACC),
+            CpuSetup()
+                .a(0x40),
+            ExpectedStepOutcome(cycles = 2, a = 0x80, carry = false, zero = false, negative = true)
+        )
+        testStep(
+            "carry out",
+            Instruction(ASL_ACC),
+            CpuSetup()
+                .a(0x81),
+            ExpectedStepOutcome(cycles = 2, a = 0x02, carry = true, zero = false, negative = false)
+        )
+        testStep(
+            "result zero",
+            Instruction(ASL_ACC),
+            CpuSetup()
+                .a(0x80),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, carry = true, zero = true, negative = false)
+        )
+    }
+    "ASL zero page" - {
+        testStep(
+            "shifts left sets N",
+            Instruction(ASL_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x40),
+            ExpectedStepOutcome(cycles = 5, carry = false, zero = false, negative = true, mem = mapOf(0x10 to 0x80))
+        )
+        testStep(
+            "carry out result zero",
+            Instruction(ASL_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x80),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = true, negative = false, mem = mapOf(0x10 to 0x00))
+        )
+    }
+    "ASL zero page,X" - {
+        testStep(
+            "indexed shift",
+            Instruction(ASL_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x14 to 0x80))
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(ASL_ZPX, 0xFF),
+            CpuSetup()
+                .x(0x02)
+                .mem(0x01, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x01 to 0x80))
+        )
+    }
+    "ASL absolute" - {
+        testStep(
+            "shifts at 16-bit address",
+            Instruction(ASL_ABS, 0x00, 0x02),
+            CpuSetup()
+                .mem(0x0200, 0x40),
+            ExpectedStepOutcome(cycles = 6, carry = false, zero = false, negative = true, mem = mapOf(0x0200 to 0x80))
+        )
+    }
+    "ASL absolute,X" - {
+        testStep(
+            "always 7 cycles RMW",
+            Instruction(ASL_ABX, 0x00, 0x02),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0201, 0x40),
+            ExpectedStepOutcome(cycles = 7, carry = false, zero = false, negative = true, mem = mapOf(0x0201 to 0x80))
         )
     }
 
@@ -361,6 +508,40 @@ class CPUInstructionTest : FreeSpec({
             Instruction(LDA_ABS, 0x00, 0x02),
             CpuSetup()
                 .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 4, a = 0x42, zero = false, negative = false)
+        )
+    }
+    "LDA zero page" - {
+        testStep(
+            "basic positive value",
+            Instruction(LDA_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x42),
+            ExpectedStepOutcome(cycles = 3, a = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero sets Z",
+            Instruction(LDA_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x00),
+            ExpectedStepOutcome(cycles = 3, a = 0x00, zero = true, negative = false)
+        )
+    }
+    "LDA zero page,X" - {
+        testStep(
+            "indexed access",
+            Instruction(LDA_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x42),
+            ExpectedStepOutcome(cycles = 4, a = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(LDA_ZPX, 0xFF),
+            CpuSetup()
+                .x(0x02)
+                .mem(0x01, 0x42),
             ExpectedStepOutcome(cycles = 4, a = 0x42, zero = false, negative = false)
         )
     }
@@ -439,6 +620,16 @@ class CPUInstructionTest : FreeSpec({
                 .mem(0x0200, 0x42),
             ExpectedStepOutcome(cycles = 6, a = 0x42, zero = false, negative = false)
         )
+        testStep(
+            "pointer wraps at zp=FF reads hi from 0x0000",
+            Instruction(LDA_INY, 0xFF),
+            CpuSetup()
+                .y(0x01)
+                .mem(0x00FF, 0x34)
+                .mem(0x0000, 0x12)
+                .mem(0x1235, 0x2A),
+            ExpectedStepOutcome(cycles = 5, a = 0x2A, zero = false, negative = false)
+        )
     }
 
     // ── LDX ──────────────────────────────────────────────────────────────
@@ -462,6 +653,40 @@ class CPUInstructionTest : FreeSpec({
             Instruction(LDX_ABS, 0x00, 0x02),
             CpuSetup()
                 .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 4, x = 0x42, zero = false, negative = false)
+        )
+    }
+    "LDX zero page" - {
+        testStep(
+            "basic load",
+            Instruction(LDX_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x42),
+            ExpectedStepOutcome(cycles = 3, x = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "negative value sets N",
+            Instruction(LDX_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x80),
+            ExpectedStepOutcome(cycles = 3, x = 0x80, zero = false, negative = true)
+        )
+    }
+    "LDX zero page,Y" - {
+        testStep(
+            "indexed access",
+            Instruction(LDX_ZPY, 0x10),
+            CpuSetup()
+                .y(0x04)
+                .mem(0x14, 0x42),
+            ExpectedStepOutcome(cycles = 4, x = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(LDX_ZPY, 0xFE),
+            CpuSetup()
+                .y(0x02)
+                .mem(0x00, 0x42),
             ExpectedStepOutcome(cycles = 4, x = 0x42, zero = false, negative = false)
         )
     }
@@ -506,6 +731,58 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .mem(0x0200, 0x42),
             ExpectedStepOutcome(cycles = 4, y = 0x42, zero = false, negative = false)
+        )
+    }
+    "LDY zero page" - {
+        testStep(
+            "basic load",
+            Instruction(LDY_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x42),
+            ExpectedStepOutcome(cycles = 3, y = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero value sets Z",
+            Instruction(LDY_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x00),
+            ExpectedStepOutcome(cycles = 3, y = 0x00, zero = true, negative = false)
+        )
+    }
+    "LDY zero page,X" - {
+        testStep(
+            "indexed access",
+            Instruction(LDY_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x42),
+            ExpectedStepOutcome(cycles = 4, y = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(LDY_ZPX, 0xFF),
+            CpuSetup()
+                .x(0x02)
+                .mem(0x01, 0x42),
+            ExpectedStepOutcome(cycles = 4, y = 0x42, zero = false, negative = false)
+        )
+    }
+    "LDY absolute,X" - {
+        testStep(
+            "no page cross",
+            Instruction(LDY_ABX, 0x00, 0x02),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0201, 0x42),
+            ExpectedStepOutcome(cycles = 4, y = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(LDY_ABX, 0xFF, 0x01),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 5, y = 0x42, zero = false, negative = false)
         )
     }
 
@@ -609,6 +886,15 @@ class CPUInstructionTest : FreeSpec({
             ExpectedStepOutcome(cycles = 4, mem = mapOf(0x14 to 0x42))
         )
     }
+    "STX absolute" - {
+        testStep(
+            "stores X",
+            Instruction(STX_ABS, 0x00, 0x02),
+            CpuSetup()
+                .x(0x42),
+            ExpectedStepOutcome(cycles = 4, mem = mapOf(0x0200 to 0x42))
+        )
+    }
 
     // ── STY ──────────────────────────────────────────────────────────────
     "STY zero page" - {
@@ -628,6 +914,15 @@ class CPUInstructionTest : FreeSpec({
                 .y(0x42)
                 .x(0x04),
             ExpectedStepOutcome(cycles = 4, mem = mapOf(0x14 to 0x42))
+        )
+    }
+    "STY absolute" - {
+        testStep(
+            "stores Y",
+            Instruction(STY_ABS, 0x00, 0x02),
+            CpuSetup()
+                .y(0x42),
+            ExpectedStepOutcome(cycles = 4, mem = mapOf(0x0200 to 0x42))
         )
     }
 
@@ -656,6 +951,128 @@ class CPUInstructionTest : FreeSpec({
             ExpectedStepOutcome(cycles = 2, carry = false, zero = false, negative = true)
         )
     }
+    "CMP zero page" - {
+        testStep(
+            "equal sets Z and C",
+            Instruction(CMP_ZP, 0x10),
+            CpuSetup()
+                .a(0x42)
+                .mem(0x10, 0x42),
+            ExpectedStepOutcome(cycles = 3, carry = true, zero = true, negative = false)
+        )
+        testStep(
+            "less than clears C sets N",
+            Instruction(CMP_ZP, 0x10),
+            CpuSetup()
+                .a(0x01)
+                .mem(0x10, 0x02),
+            ExpectedStepOutcome(cycles = 3, carry = false, zero = false, negative = true)
+        )
+    }
+    "CMP zero page,X" - {
+        testStep(
+            "greater than sets C",
+            Instruction(CMP_ZPX, 0x10),
+            CpuSetup()
+                .a(0x42)
+                .x(0x04)
+                .mem(0x14, 0x01),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = false, negative = false)
+        )
+        testStep(
+            "zero page wraps",
+            Instruction(CMP_ZPX, 0xFF),
+            CpuSetup()
+                .a(0x42)
+                .x(0x02)
+                .mem(0x01, 0x42),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = true, negative = false)
+        )
+    }
+    "CMP absolute" - {
+        testStep(
+            "basic verify all flags",
+            Instruction(CMP_ABS, 0x00, 0x02),
+            CpuSetup()
+                .a(0x42)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = true, negative = false)
+        )
+    }
+    "CMP absolute,X" - {
+        testStep(
+            "no page cross",
+            Instruction(CMP_ABX, 0x00, 0x02),
+            CpuSetup()
+                .a(0x42)
+                .x(0x01)
+                .mem(0x0201, 0x42),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = true, negative = false)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(CMP_ABX, 0xFF, 0x01),
+            CpuSetup()
+                .a(0x42)
+                .x(0x01)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = true, negative = false)
+        )
+    }
+    "CMP absolute,Y" - {
+        testStep(
+            "no page cross",
+            Instruction(CMP_ABY, 0x00, 0x02),
+            CpuSetup()
+                .a(0x42)
+                .y(0x01)
+                .mem(0x0201, 0x42),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = true, negative = false)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(CMP_ABY, 0xFF, 0x01),
+            CpuSetup()
+                .a(0x42)
+                .y(0x01)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = true, negative = false)
+        )
+    }
+    "CMP (indirect,X)" - {
+        testStep(
+            "pointer lookup via zp+X",
+            Instruction(CMP_INX, 0x10),
+            CpuSetup()
+                .a(0x42)
+                .x(0x04)
+                .mem(0x14, 0x00, 0x02)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 6, carry = true, zero = true, negative = false)
+        )
+    }
+    "CMP (indirect),Y" - {
+        testStep(
+            "no page cross",
+            Instruction(CMP_INY, 0x10),
+            CpuSetup()
+                .a(0x42)
+                .y(0x01)
+                .mem(0x10, 0x00, 0x02)
+                .mem(0x0201, 0x42),
+            ExpectedStepOutcome(cycles = 5, carry = true, zero = true, negative = false)
+        )
+        testStep(
+            "page cross +1 cycle",
+            Instruction(CMP_INY, 0x10),
+            CpuSetup()
+                .a(0x42)
+                .y(0x01)
+                .mem(0x10, 0xFF, 0x01)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 6, carry = true, zero = true, negative = false)
+        )
+    }
 
     // ── CPX ──────────────────────────────────────────────────────────────
     "CPX immediate" - {
@@ -674,6 +1091,26 @@ class CPUInstructionTest : FreeSpec({
             ExpectedStepOutcome(cycles = 2, carry = false, zero = false, negative = true)
         )
     }
+    "CPX zero page" - {
+        testStep(
+            "equal sets Z and C",
+            Instruction(CPX_ZP, 0x10),
+            CpuSetup()
+                .x(0x42)
+                .mem(0x10, 0x42),
+            ExpectedStepOutcome(cycles = 3, carry = true, zero = true, negative = false)
+        )
+    }
+    "CPX absolute" - {
+        testStep(
+            "greater than sets C",
+            Instruction(CPX_ABS, 0x00, 0x02),
+            CpuSetup()
+                .x(0x42)
+                .mem(0x0200, 0x01),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = false, negative = false)
+        )
+    }
 
     // ── CPY ──────────────────────────────────────────────────────────────
     "CPY immediate" - {
@@ -690,6 +1127,26 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .y(0x01),
             ExpectedStepOutcome(cycles = 2, carry = false, zero = false, negative = true)
+        )
+    }
+    "CPY zero page" - {
+        testStep(
+            "less than clears C sets N",
+            Instruction(CPY_ZP, 0x10),
+            CpuSetup()
+                .y(0x01)
+                .mem(0x10, 0x02),
+            ExpectedStepOutcome(cycles = 3, carry = false, zero = false, negative = true)
+        )
+    }
+    "CPY absolute" - {
+        testStep(
+            "equal sets Z and C",
+            Instruction(CPY_ABS, 0x00, 0x02),
+            CpuSetup()
+                .y(0x42)
+                .mem(0x0200, 0x42),
+            ExpectedStepOutcome(cycles = 4, carry = true, zero = true, negative = false)
         )
     }
 
@@ -745,6 +1202,60 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .x(0x01)
                 .mem(0x0201, 0x41),
+            ExpectedStepOutcome(cycles = 7, zero = false, negative = false, mem = mapOf(0x0201 to 0x42))
+        )
+    }
+
+    // ── DEC ──────────────────────────────────────────────────────────────
+    "DEC zero page" - {
+        testStep(
+            "decrements value",
+            Instruction(DEC_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x43),
+            ExpectedStepOutcome(cycles = 5, zero = false, negative = false, mem = mapOf(0x10 to 0x42))
+        )
+        testStep(
+            "result zero sets Z",
+            Instruction(DEC_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x01),
+            ExpectedStepOutcome(cycles = 5, zero = true, negative = false, mem = mapOf(0x10 to 0x00))
+        )
+        testStep(
+            "wraps 0x00 to 0xFF sets N",
+            Instruction(DEC_ZP, 0x10),
+            CpuSetup()
+                .mem(0x10, 0x00),
+            ExpectedStepOutcome(cycles = 5, zero = false, negative = true, mem = mapOf(0x10 to 0xFF))
+        )
+    }
+    "DEC zero page,X" - {
+        testStep(
+            "indexed decrement",
+            Instruction(DEC_ZPX, 0x10),
+            CpuSetup()
+                .x(0x04)
+                .mem(0x14, 0x43),
+            ExpectedStepOutcome(cycles = 6, zero = false, negative = false, mem = mapOf(0x14 to 0x42))
+        )
+    }
+    "DEC absolute" - {
+        testStep(
+            "decrements at 16-bit address",
+            Instruction(DEC_ABS, 0x00, 0x02),
+            CpuSetup()
+                .mem(0x0200, 0x43),
+            ExpectedStepOutcome(cycles = 6, zero = false, negative = false, mem = mapOf(0x0200 to 0x42))
+        )
+    }
+    "DEC absolute,X" - {
+        testStep(
+            "always 7 cycles RMW",
+            Instruction(DEC_ABX, 0x00, 0x02),
+            CpuSetup()
+                .x(0x01)
+                .mem(0x0201, 0x43),
             ExpectedStepOutcome(cycles = 7, zero = false, negative = false, mem = mapOf(0x0201 to 0x42))
         )
     }
@@ -824,6 +1335,13 @@ class CPUInstructionTest : FreeSpec({
                 .a(0x00),
             ExpectedStepOutcome(cycles = 2, x = 0x00, zero = true, negative = false)
         )
+        testStep(
+            "negative sets N",
+            Instruction(TAX),
+            CpuSetup()
+                .a(0x80),
+            ExpectedStepOutcome(cycles = 2, x = 0x80, zero = false, negative = true)
+        )
     }
     "TXA implied" - {
         testStep(
@@ -832,6 +1350,20 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .x(0x42),
             ExpectedStepOutcome(cycles = 2, a = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero sets Z",
+            Instruction(TXA),
+            CpuSetup()
+                .x(0x00),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, zero = true, negative = false)
+        )
+        testStep(
+            "negative sets N",
+            Instruction(TXA),
+            CpuSetup()
+                .x(0x80),
+            ExpectedStepOutcome(cycles = 2, a = 0x80, zero = false, negative = true)
         )
     }
     "TYA implied" - {
@@ -842,6 +1374,20 @@ class CPUInstructionTest : FreeSpec({
                 .y(0x42),
             ExpectedStepOutcome(cycles = 2, a = 0x42, zero = false, negative = false)
         )
+        testStep(
+            "zero sets Z",
+            Instruction(TYA),
+            CpuSetup()
+                .y(0x00),
+            ExpectedStepOutcome(cycles = 2, a = 0x00, zero = true, negative = false)
+        )
+        testStep(
+            "negative sets N",
+            Instruction(TYA),
+            CpuSetup()
+                .y(0x80),
+            ExpectedStepOutcome(cycles = 2, a = 0x80, zero = false, negative = true)
+        )
     }
     "TXS implied" - {
         // TXS does NOT set flags
@@ -851,6 +1397,46 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .x(0xFD),
             ExpectedStepOutcome(cycles = 2, sp = 0xFD)
+        )
+    }
+    "TAY implied" - {
+        testStep(
+            "transfers A to Y",
+            Instruction(TAY),
+            CpuSetup()
+                .a(0x42),
+            ExpectedStepOutcome(cycles = 2, y = 0x42, zero = false, negative = false)
+        )
+        testStep(
+            "zero sets Z",
+            Instruction(TAY),
+            CpuSetup()
+                .a(0x00),
+            ExpectedStepOutcome(cycles = 2, y = 0x00, zero = true, negative = false)
+        )
+        testStep(
+            "negative sets N",
+            Instruction(TAY),
+            CpuSetup()
+                .a(0x80),
+            ExpectedStepOutcome(cycles = 2, y = 0x80, zero = false, negative = true)
+        )
+    }
+    // TSX sets N/Z; TXS does not
+    "TSX implied" - {
+        testStep(
+            "transfers SP to X sets N",
+            Instruction(TSX),
+            CpuSetup()
+                .sp(0xFD),
+            ExpectedStepOutcome(cycles = 2, x = 0xFD, zero = false, negative = true)
+        )
+        testStep(
+            "zero sets Z",
+            Instruction(TSX),
+            CpuSetup()
+                .sp(0x00),
+            ExpectedStepOutcome(cycles = 2, x = 0x00, zero = true, negative = false)
         )
     }
 
@@ -881,6 +1467,65 @@ class CPUInstructionTest : FreeSpec({
                 .sp(0xFE)
                 .mem(0x01FF, 0x00),
             ExpectedStepOutcome(cycles = 4, a = 0x00, sp = 0xFF, zero = true, negative = false)
+        )
+        testStep(
+            "pulls negative value sets N",
+            Instruction(PLA),
+            CpuSetup()
+                .sp(0xFE)
+                .mem(0x01FF, 0x80),
+            ExpectedStepOutcome(cycles = 4, a = 0x80, sp = 0xFF, zero = false, negative = true)
+        )
+    }
+    "PHP implied" - {
+        // PHP pushes status with bits 4 (B) and 5 forced set; CPU status is unchanged.
+        // After reset, status = 0x24 (bit 5 | FLAG_INTERRUPT). Clearing interrupt → 0x20.
+        testStep(
+            "pushes status with B bit set decrements SP",
+            Instruction(PHP),
+            CpuSetup()
+                .sp(0xFF)
+                .interrupt(false),
+            // status = 0x20, pushed = 0x20 | 0x30 = 0x30
+            ExpectedStepOutcome(cycles = 3, sp = 0xFE, mem = mapOf(0x01FF to 0x30))
+        )
+        testStep(
+            "B bit set in pushed byte regardless of other flags",
+            Instruction(PHP),
+            CpuSetup()
+                .sp(0xFF)
+                .carry(true)
+                .interrupt(false),
+            // status = 0x21, pushed = 0x21 | 0x30 = 0x31
+            ExpectedStepOutcome(cycles = 3, sp = 0xFE, mem = mapOf(0x01FF to 0x31))
+        )
+    }
+    "PLP implied" - {
+        // PLP restores all flags; bit 5 always 1 in status after pull; bit 4 (B) cleared.
+        testStep(
+            "pulls all flags from stack",
+            Instruction(PLP),
+            CpuSetup()
+                .sp(0xFE)
+                .interrupt(false)
+                .mem(0x01FF, 0xFF),
+            // pulled 0xFF → status = (0xFF & 0xEF) | 0x20 = 0xEF
+            ExpectedStepOutcome(cycles = 4, sp = 0xFF, carry = true, zero = true, negative = true, overflow = true, interrupt = true, decimal = true)
+        )
+        testStep(
+            "clears all flags",
+            Instruction(PLP),
+            CpuSetup()
+                .sp(0xFE)
+                .carry(true)
+                .zero(true)
+                .negative(true)
+                .overflow(true)
+                .interrupt(true)
+                .decimal(true)
+                .mem(0x01FF, 0x00),
+            // pulled 0x00 → status = (0x00 & 0xEF) | 0x20 = 0x20
+            ExpectedStepOutcome(cycles = 4, sp = 0xFF, carry = false, zero = false, negative = false, overflow = false, interrupt = false, decimal = false)
         )
     }
 
@@ -933,6 +1578,14 @@ class CPUInstructionTest : FreeSpec({
                 .sp(0xFD)
                 .mem(0x01FE, 0x02, 0x80),
             ExpectedStepOutcome(cycles = 6, pc = 0x8003, sp = 0xFF)
+        )
+        testStep(
+            "increments across page boundary",
+            Instruction(RTS),
+            CpuSetup()
+                .sp(0xFD)
+                .mem(0x01FE, 0xFF, 0x80),
+            ExpectedStepOutcome(cycles = 6, pc = 0x8100, sp = 0xFF)
         )
     }
 
@@ -1161,6 +1814,51 @@ class CPUInstructionTest : FreeSpec({
             CpuSetup()
                 .decimal(true),
             ExpectedStepOutcome(cycles = 2, decimal = false)
+        )
+    }
+    "CLC implied" - {
+        testStep(
+            "clears C flag",
+            Instruction(CLC),
+            CpuSetup()
+                .carry(true),
+            ExpectedStepOutcome(cycles = 2, carry = false)
+        )
+    }
+    "SEC implied" - {
+        testStep(
+            "sets C flag",
+            Instruction(SEC),
+            CpuSetup()
+                .carry(false),
+            ExpectedStepOutcome(cycles = 2, carry = true)
+        )
+    }
+    "CLI implied" - {
+        testStep(
+            "clears I flag",
+            Instruction(CLI),
+            CpuSetup()
+                .interrupt(true),
+            ExpectedStepOutcome(cycles = 2, interrupt = false)
+        )
+    }
+    "CLV implied" - {
+        testStep(
+            "clears V flag",
+            Instruction(CLV),
+            CpuSetup()
+                .overflow(true),
+            ExpectedStepOutcome(cycles = 2, overflow = false)
+        )
+    }
+    "SED implied" - {
+        testStep(
+            "sets D flag",
+            Instruction(SED),
+            CpuSetup()
+                .decimal(false),
+            ExpectedStepOutcome(cycles = 2, decimal = true)
         )
     }
 
