@@ -5,6 +5,9 @@ open class MemoryBus(
     private val prgRom: ByteArray,
     private val cpuRam: ByteArray = ByteArray(0x0800),
 ) {
+    private val journals = mutableListOf<(addr: Int, value: Int) -> Unit>()
+
+    fun addJournal(fn: (addr: Int, value: Int) -> Unit) { journals.add(fn) }
     fun read(address: Int): Int = when (address) {
         in 0x0000..0x1FFF -> {
             // 2KB internal RAM, mirrored every 2KB
@@ -50,5 +53,6 @@ open class MemoryBus(
                 // Ignore writes to unimplemented areas for now
             }
         }
+        journals.forEach { it(address, value) }
     }
 }

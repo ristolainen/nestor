@@ -1,5 +1,9 @@
 package nestor
 
+import io.kotest.assertions.withClue
+import io.kotest.core.spec.style.scopes.FreeSpecContainerScope
+import io.kotest.matchers.shouldBe
+
 /**
  * Generates a 2bpp NES tile with a checkerboard pattern (color indices 0 and 1).
  * Color layout:
@@ -163,4 +167,199 @@ fun printAnsiTile(frame: IntArray, tileX: Int, tileY: Int) {
         }
         println(row)
     }
+}
+
+// ── CPU test DSL ─────────────────────────────────────────────────────────────
+
+data class CpuState(
+    val a: Int,
+    val x: Int,
+    val y: Int,
+    val sp: Int,
+    val pc: Int,
+    val carry: Boolean,
+    val zero: Boolean,
+    val negative: Boolean,
+    val overflow: Boolean,
+    val interrupt: Boolean,
+    val decimal: Boolean,
+)
+
+data class CpuDelta(
+    val a: Int? = null,
+    val x: Int? = null,
+    val y: Int? = null,
+    val sp: Int? = null,
+    val carry: Boolean? = null,
+    val zero: Boolean? = null,
+    val negative: Boolean? = null,
+    val overflow: Boolean? = null,
+    val interrupt: Boolean? = null,
+    val decimal: Boolean? = null,
+    val mem: Map<Int, Int> = emptyMap(),
+)
+
+data class ExpectedStepOutcome(
+    val cycles: Int,
+    val a: Int? = null,
+    val x: Int? = null,
+    val y: Int? = null,
+    val sp: Int? = null,
+    val pc: Int? = null,
+    val carry: Boolean? = null,
+    val zero: Boolean? = null,
+    val negative: Boolean? = null,
+    val overflow: Boolean? = null,
+    val interrupt: Boolean? = null,
+    val decimal: Boolean? = null,
+    val mem: Map<Int, Int> = emptyMap(),
+) {
+    fun verify(actual: CpuDelta, after: CpuState) {
+        // Rule 1 — check expected final state
+        a?.let         { withClue("a")         { after.a         shouldBe it } }
+        x?.let         { withClue("x")         { after.x         shouldBe it } }
+        y?.let         { withClue("y")         { after.y         shouldBe it } }
+        sp?.let        { withClue("sp")        { after.sp        shouldBe it } }
+        carry?.let     { withClue("carry")     { after.carry     shouldBe it } }
+        zero?.let      { withClue("zero")      { after.zero      shouldBe it } }
+        negative?.let  { withClue("negative")  { after.negative  shouldBe it } }
+        overflow?.let  { withClue("overflow")  { after.overflow  shouldBe it } }
+        interrupt?.let { withClue("interrupt") { after.interrupt shouldBe it } }
+        decimal?.let   { withClue("decimal")   { after.decimal   shouldBe it } }
+
+        // Rule 2 — reject unexpected changes
+        if (a         == null) withClue("unexpected change to a")         { actual.a         shouldBe null }
+        if (x         == null) withClue("unexpected change to x")         { actual.x         shouldBe null }
+        if (y         == null) withClue("unexpected change to y")         { actual.y         shouldBe null }
+        if (sp        == null) withClue("unexpected change to sp")        { actual.sp        shouldBe null }
+        if (carry     == null) withClue("unexpected change to carry")     { actual.carry     shouldBe null }
+        if (zero      == null) withClue("unexpected change to zero")      { actual.zero      shouldBe null }
+        if (negative  == null) withClue("unexpected change to negative")  { actual.negative  shouldBe null }
+        if (overflow  == null) withClue("unexpected change to overflow")  { actual.overflow  shouldBe null }
+        if (interrupt == null) withClue("unexpected change to interrupt") { actual.interrupt shouldBe null }
+        if (decimal   == null) withClue("unexpected change to decimal")   { actual.decimal   shouldBe null }
+
+        // Rule 3 — memory writes must match exactly
+        withClue("memory writes") { actual.mem shouldBe mem }
+    }
+}
+
+class CpuSetup {
+    var a: Int? = null
+    var x: Int? = null
+    var y: Int? = null
+    var sp: Int? = null
+    var carry: Boolean? = null
+    var zero: Boolean? = null
+    var negative: Boolean? = null
+    var overflow: Boolean? = null
+    var interrupt: Boolean? = null
+    var decimal: Boolean? = null
+    private val _mem = mutableMapOf<Int, Int>()
+    val mem: Map<Int, Int> get() = _mem
+
+    fun a(v: Int) = apply { this.a = v }
+    fun x(v: Int) = apply { this.x = v }
+    fun y(v: Int) = apply { this.y = v }
+    fun sp(v: Int) = apply { this.sp = v }
+    fun carry(v: Boolean) = apply { this.carry = v }
+    fun zero(v: Boolean) = apply { this.zero = v }
+    fun negative(v: Boolean) = apply { this.negative = v }
+    fun overflow(v: Boolean) = apply { this.overflow = v }
+    fun interrupt(v: Boolean) = apply { this.interrupt = v }
+    fun decimal(v: Boolean) = apply { this.decimal = v }
+    fun mem(addr: Int, vararg values: Int) = apply {
+        values.forEachIndexed { i, v -> _mem[addr + i] = v }
+    }
+}
+
+class Instruction(val opcode: Int, vararg val operands: Int) {
+    val bytes = intArrayOf(opcode) + operands
+    val size = 1 + operands.size
+}
+
+private fun snapshotCpu(cpu: CPU) = CpuState(
+    a         = cpu.a,
+    x         = cpu.x,
+    y         = cpu.y,
+    sp        = cpu.sp,
+    pc        = cpu.pc,
+    carry     = (cpu.status and FLAG_CARRY)             != 0,
+    zero      = (cpu.status and FLAG_ZERO)              != 0,
+    negative  = (cpu.status and FLAG_NEGATIVE)          != 0,
+    overflow  = (cpu.status and FLAG_OVERFLOW)          != 0,
+    interrupt = (cpu.status and FLAG_INTERRUPT_DISABLE) != 0,
+    decimal   = (cpu.status and FLAG_DECIMAL)           != 0,
+)
+
+class CpuFixture(
+    val cpu: CPU,
+    private val instruction: Instruction,
+    private val startAddress: Int,
+) {
+    fun withState(setup: CpuSetup) = apply {
+        setup.a?.let  { cpu.a  = it }
+        setup.x?.let  { cpu.x  = it }
+        setup.y?.let  { cpu.y  = it }
+        setup.sp?.let { cpu.sp = it }
+
+        var s = cpu.status
+        setup.carry?.let     { s = if (it) s or FLAG_CARRY             else s and FLAG_CARRY.inv() }
+        setup.zero?.let      { s = if (it) s or FLAG_ZERO              else s and FLAG_ZERO.inv() }
+        setup.negative?.let  { s = if (it) s or FLAG_NEGATIVE          else s and FLAG_NEGATIVE.inv() }
+        setup.overflow?.let  { s = if (it) s or FLAG_OVERFLOW          else s and FLAG_OVERFLOW.inv() }
+        setup.interrupt?.let { s = if (it) s or FLAG_INTERRUPT_DISABLE else s and FLAG_INTERRUPT_DISABLE.inv() }
+        setup.decimal?.let   { s = if (it) s or FLAG_DECIMAL           else s and FLAG_DECIMAL.inv() }
+        cpu.status = s
+
+        setup.mem.forEach { (addr, v) -> cpu.memory.write(addr, v) }
+    }
+
+    fun assertDelta(expected: ExpectedStepOutcome) {
+        val before = snapshotCpu(cpu)
+        val writes = mutableMapOf<Int, Int>()
+        cpu.memory.addJournal { addr, v -> writes[addr] = v }
+
+        val actualCycles = cpu.step()
+        val after = snapshotCpu(cpu)
+
+        withClue("cycles") { actualCycles shouldBe expected.cycles }
+        withClue("pc") { cpu.pc shouldBe (expected.pc ?: (startAddress + instruction.size)) }
+        expected.verify(computeDelta(before, after, writes), after)
+    }
+
+    private fun computeDelta(before: CpuState, after: CpuState, memWrites: Map<Int, Int>) = CpuDelta(
+        a         = if (after.a         != before.a)         after.a         else null,
+        x         = if (after.x         != before.x)         after.x         else null,
+        y         = if (after.y         != before.y)         after.y         else null,
+        sp        = if (after.sp        != before.sp)        after.sp        else null,
+        carry     = if (after.carry     != before.carry)     after.carry     else null,
+        zero      = if (after.zero      != before.zero)      after.zero      else null,
+        negative  = if (after.negative  != before.negative)  after.negative  else null,
+        overflow  = if (after.overflow  != before.overflow)  after.overflow  else null,
+        interrupt = if (after.interrupt != before.interrupt) after.interrupt else null,
+        decimal   = if (after.decimal   != before.decimal)   after.decimal   else null,
+        mem       = memWrites,
+    )
+}
+
+fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(emptyList())): CpuFixture {
+    val prgRom = ByteArray(0x4000)
+    val offset = address - 0x8000
+    instruction.bytes.forEachIndexed { i, b -> prgRom[offset + i] = b.toByte() }
+    prgRom[0x3FFC] = (address and 0xFF).toByte()
+    prgRom[0x3FFD] = ((address shr 8) and 0xFF).toByte()
+    val cpu = CPU(MemoryBus(ppu, prgRom))
+    cpu.reset()
+    return CpuFixture(cpu, instruction, startAddress = address)
+}
+
+suspend fun FreeSpecContainerScope.testStep(
+    label: String,
+    instruction: Instruction,
+    setup: CpuSetup,
+    expected: ExpectedStepOutcome,
+    address: Int = 0x8000,
+) = label {
+    cpu(instruction, address).withState(setup).assertDelta(expected)
 }
