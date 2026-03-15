@@ -73,7 +73,7 @@ class PPU(private val chrRom: ByteArray) {
         0x2002 -> readStatus()
         0x2004 -> readOamData()
         0x2007 -> readPpuData()
-        else -> throw IllegalArgumentException("PPU: Unsupported read from ${addr.hex()}")
+        else -> 0 // write-only registers return open bus (0)
     }
 
     fun cpuWrite(addr: Int, value: Int) {
@@ -90,7 +90,7 @@ class PPU(private val chrRom: ByteArray) {
     }
 
     private fun readStatus(): Int {
-        val result = status or (status and 0xE0) // NMI + sprite flags
+        val result = status and 0xE0 // upper 3 bits only; lower 5 are open bus
         clearStatusFlag(STATUS_VBLANK)
         writeToggle = false      // Reset address latch
         nmiOccurred = false
@@ -104,11 +104,8 @@ class PPU(private val chrRom: ByteArray) {
     private fun readPpuData(): Int {
         val result = when (vramAddr) {
             in 0x0000 until NAMETABLE_START -> {
-                // TODO: Pattern table ($0000–$1FFF) reads should return raw CHR-ROM bytes.
-                // Currently the PPU only holds pre-parsed tile data, not raw bytes.
-                // For now, return the stale buffer and advance — SMB never reads CHR via $2007.
                 val buffered = ppuDataBuffer
-                ppuDataBuffer = 0
+                ppuDataBuffer = chrRom[vramAddr]
                 buffered.toUByte().toInt()
             }
 
@@ -125,7 +122,7 @@ class PPU(private val chrRom: ByteArray) {
             }
         }
 
-        vramAddr = (vramAddr + 1) and 0x3FFF
+        vramAddr = (vramAddr + vramIncrement()) and 0x3FFF
         return result
     }
 
@@ -193,8 +190,10 @@ class PPU(private val chrRom: ByteArray) {
             }
         }
 
-        vramAddr = (vramAddr + 1) and 0x3FFF
+        vramAddr = (vramAddr + vramIncrement()) and 0x3FFF
     }
+
+    private fun vramIncrement() = if ((control and 0x04) != 0) 32 else 1
 
     private fun mirrorNametableAddr(addr: Int): Int =
         // Mirror $2000–$2FFF into 2KB nametable RAM

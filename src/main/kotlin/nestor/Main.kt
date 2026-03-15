@@ -22,7 +22,7 @@ fun main() {
 
     val cpu = CPU(memoryBus)
     val emulation = Emulation(cpu, ppu, memoryBus)
-    emulation.runFrames(64)
+    emulation.runFrames(32)
 
     ppu.renderFrame()
     screen.draw(ppu.currentFrame())

@@ -197,6 +197,13 @@ class PPUTest : FreeSpec({
     }
 
     "cpuRead" - {
+        "cpuRead of write-only registers should return 0" {
+            val ppu = PPU(ByteArray(0))
+            listOf(0x2000, 0x2001, 0x2003, 0x2005, 0x2006).forEach { addr ->
+                ppu.cpuRead(addr) shouldBe 0
+            }
+        }
+
         "cpuRead $2002 should return status and clear VBlank and writeToggle" {
             val ppu = PPU(ByteArray(0))
             ppu.status = 0b11100000  // VBlank + sprite flags set
@@ -207,6 +214,14 @@ class PPUTest : FreeSpec({
             ppu.writeToggle shouldBe false
         }
 
+        "cpuRead $2002 should mask off lower 5 bits (open bus)" {
+            val ppu = PPU(ByteArray(0))
+            ppu.status = 0xFF  // all bits set, including lower 5 open-bus bits
+            val result = ppu.cpuRead(0x2002)
+
+            result shouldBe 0xE0  // only upper 3 bits returned
+        }
+
         "cpuRead $2004 should return value at OAMADDR" {
             val ppu = PPU(ByteArray(0))
             ppu.oamRam[5] = 0x42
@@ -214,6 +229,23 @@ class PPUTest : FreeSpec({
 
             val result = ppu.cpuRead(0x2004)
             result shouldBe 0x42
+        }
+
+        "cpuRead $2007 should return buffered CHR-ROM byte on pattern table access" {
+            val chrRom = ByteArray(0x2000)
+            chrRom[0x0000] = 0xAB.toByte()
+            chrRom[0x0001] = 0xCD.toByte()
+            val ppu = PPU(chrRom)
+            ppu.vramAddr = 0x0000
+
+            // First read: returns old buffer, loads chrRom[0x0000] into buffer
+            ppu.ppuDataBuffer = 0x11
+            val first = ppu.cpuRead(0x2007)
+            val second = ppu.cpuRead(0x2007)
+
+            first shouldBe 0x11             // old buffer
+            second shouldBe 0xAB            // was just buffered from chrRom[0x0000]
+            ppu.ppuDataBuffer.toUByte().toInt() shouldBe 0xCD
         }
 
         "cpuRead $2007 should return buffered value on nametable access" {
@@ -340,6 +372,25 @@ class PPUTest : FreeSpec({
             ppu.cpuWrite(0x2007, 0x0F)
 
             ppu.paletteRam[0x00] shouldBe 0x0F.toByte()
+        }
+
+        "cpuWrite $2007 should increment vramAddr by 32 when PPUCTRL bit 2 is set" {
+            val ppu = PPU(ByteArray(0))
+            ppu.control = 0x04  // bit 2 set → vertical increment (+32)
+            ppu.vramAddr = 0x2000
+            ppu.cpuWrite(0x2007, 0x99)
+
+            ppu.vramAddr shouldBe 0x2020
+        }
+
+        "cpuRead $2007 should increment vramAddr by 32 when PPUCTRL bit 2 is set" {
+            val ppu = PPU(ByteArray(0))
+            ppu.control = 0x04  // bit 2 set → vertical increment (+32)
+            ppu.vramAddr = 0x2000
+
+            ppu.cpuRead(0x2007)
+
+            ppu.vramAddr shouldBe 0x2020
         }
     }
 })

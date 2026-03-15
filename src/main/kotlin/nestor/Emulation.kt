@@ -25,7 +25,6 @@ class Emulation(
 
     fun runFrame() {
         println("Running one frame")
-        cpu.reset()
         var cycles = 0
         while (cycles < 29780) {
             cycles += step()
