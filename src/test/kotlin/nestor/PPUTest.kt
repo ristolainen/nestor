@@ -165,6 +165,58 @@ class PPUTest : FreeSpec({
         }
     }
 
+    "background pattern table selection via PPUCTRL bit 4" - {
+        // Build a tile list with 512 entries: bank 0 = blank tiles, bank 1 = distinct tiles.
+        // tile index 0 in bank 0 → checkerboard; tile index 0 in bank 1 (= tiles[256]) → striped.
+        fun makeBankedTiles(): List<Array<IntArray>> {
+            val tiles = MutableList<Array<IntArray>>(256) { makeBlankTile() }
+            tiles[0] = makeCheckerboardTile()  // bank 0, tile 0
+            tiles.add(makeStripedTile())        // bank 1, tile 0 = index 256
+            return tiles
+        }
+
+        fun writePpuAddr(ppu: PPU, bus: MemoryBus, addr: Int) {
+            bus.write(0x2006, (addr shr 8) and 0xFF)
+            bus.write(0x2006, addr and 0xFF)
+        }
+
+        fun setupNametableAndPalette(ppu: PPU, bus: MemoryBus) {
+            writePpuAddr(ppu, bus, 0x2000)
+            bus.write(0x2007, 0x00) // tile index 0 at position (0,0)
+            writePpuAddr(ppu, bus, 0x3F00)
+            bus.write(0x2007, 0x0F) // universal bg
+            bus.write(0x2007, 0x01) // palette 0 color 1
+            bus.write(0x2007, 0x21) // palette 0 color 2
+            bus.write(0x2007, 0x31) // palette 0 color 3
+        }
+
+        "PPUCTRL bit 4 = 0 uses bank 0 (tiles 0–255)" {
+            val ppu = PPU(makeBankedTiles())
+            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            ppu.control = 0x00 // bit 4 clear → bank 0
+            setupNametableAndPalette(ppu, bus)
+
+            ppu.renderFrame()
+            val frame = ppu.currentFrame()
+
+            // Bank 0 tile 0 = checkerboard: pixel (0,0) has color index 1
+            frame[0] shouldBe nesPalette[0x01]
+        }
+
+        "PPUCTRL bit 4 = 1 uses bank 1 (tiles 256–511)" {
+            val ppu = PPU(makeBankedTiles())
+            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            ppu.control = 0x10 // bit 4 set → bank 1
+            setupNametableAndPalette(ppu, bus)
+
+            ppu.renderFrame()
+            val frame = ppu.currentFrame()
+
+            // Bank 1 tile 0 = striped: pixel (0,0) has color index 3
+            frame[0] shouldBe nesPalette[0x31]
+        }
+    }
+
     "cpuRead" - {
         "cpuRead $2002 should return status and clear VBlank and writeToggle" {
             val ppu = PPU(emptyList())

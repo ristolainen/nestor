@@ -17,6 +17,7 @@ const val NAMETABLE_START = 0x2000
 const val PALETTE_START = 0x3F00
 
 const val STATUS_VBLANK = 0b10000000
+const val CTRL_BG_PATTERN_TABLE = 0x10
 
 class PPU(
     val tiles: List<Array<IntArray>>,
@@ -240,8 +241,9 @@ class PPU(
             "getTile(): tile coordinates out of bounds — tileX=$tileX (max ${TILES_PER_ROW - 1}), tileY=$tileY (max ${TILES_PER_COL - 1})"
         }
         val nametableIndex = tileY * TILES_PER_ROW + tileX
-        val tileIndex = nametableRam[nametableIndex].toUByte().toInt()
-        return tiles[tileIndex]
+        val tileId = nametableRam[nametableIndex].toUByte().toInt()
+        val bgPatternOffset = if ((control and CTRL_BG_PATTERN_TABLE) != 0) 256 else 0
+        return tiles[bgPatternOffset + tileId]
     }
 
     private fun getPaletteForTile(tileX: Int, tileY: Int): IntArray {
