@@ -35,20 +35,6 @@ class PPUTest : FreeSpec({
             (ppu.status and STATUS_VBLANK) shouldBe 0          // VBlank cleared
             ppu.writeToggle shouldBe false                     // latch reset
         }
-
-        "readStatus ($2002) should clear VBLANK and reset the address latch (writeToggle)" {
-            val ppu = PPU(ByteArray(0))
-
-            // Set VBLANK and toggle latch to verify side effects of reading $2002.
-            ppu.status = ppu.status or STATUS_VBLANK
-            ppu.writeToggle = true
-
-            // CPU read of PPUSTATUS ($2002).
-            ppu.cpuRead(0x2002)
-
-            (ppu.status and STATUS_VBLANK) shouldBe 0          // VBlank cleared on read
-            ppu.writeToggle shouldBe false                     // latch reset on read
-        }
     }
 
     "renderFrame" - {
