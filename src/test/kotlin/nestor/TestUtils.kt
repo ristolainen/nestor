@@ -354,7 +354,7 @@ class ChrRomBuilder(banks: Int = 1) {
     fun build(): ByteArray = data
 }
 
-fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(ByteArray(0))): CpuFixture {
+fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(ByteArray(0), MirroringMode.VERTICAL)): CpuFixture {
     val prgRom = ByteArray(0x4000)
     val offset = address - 0x8000
     instruction.bytes.forEachIndexed { i, b -> prgRom[offset + i] = b.toByte() }

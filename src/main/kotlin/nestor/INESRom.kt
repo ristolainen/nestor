@@ -11,5 +11,6 @@ data class INESRom(
         val mapperNumber: Int,
         val prgSize: Int,
         val chrSize: Int,
+        val mirroring: MirroringMode,
     )
 }

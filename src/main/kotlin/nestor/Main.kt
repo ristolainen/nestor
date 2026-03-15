@@ -9,7 +9,7 @@ fun main() {
     // val rom = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
     val inesRom = RomReader.read(rom)
 
-    val ppu = PPU(inesRom.chrData)
+    val ppu = PPU(inesRom.chrData, inesRom.header.mirroring)
     val memoryBus = MemoryBus(ppu, inesRom.prgData)
     //fakePalette(memoryBus)
     //fakeNameTables(memoryBus)
@@ -19,7 +19,7 @@ fun main() {
 
     val cpu = CPU(memoryBus)
     val emulation = Emulation(cpu, ppu, memoryBus)
-    emulation.runFrames(32)
+    emulation.runFrames(40)
 
     screen.draw(ppu.currentFrame())
 }

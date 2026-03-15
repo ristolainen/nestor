@@ -39,7 +39,7 @@ class NMITest : FreeSpec({
         prg[0x3FFA] = 0x00; prg[0x3FFB] = 0x90.toByte() // NMI vector -> $9000
         prg[0x3FFC] = 0x00; prg[0x3FFD] = 0x80.toByte() // RESET vector -> $8000
 
-        val ppu = PPU(ByteArray(0))
+        val ppu = PPU(ByteArray(0), MirroringMode.VERTICAL)
 
         // --- CPU + MemoryBus -------------------------------------------------------------------
         val mem = MemoryBus(ppu, prg)

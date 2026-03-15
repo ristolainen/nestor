@@ -20,7 +20,7 @@ const val STATUS_VBLANK = 0b10000000
 const val CTRL_BG_PATTERN_TABLE = 0x10
 const val MASK_BG_ENABLE = 0x08
 
-class PPU(private val chrRom: ByteArray) {
+class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     private val tiles = TileParser.parseTiles(chrRom)
     internal val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE)
     internal val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE)
@@ -51,20 +51,23 @@ class PPU(private val chrRom: ByteArray) {
             if (cycle > 340) {
                 cycle = 0
                 scanline++
+                if (scanline >= 262) {
+                    scanline = 0
+                    frame++
+                }
+            }
+
+            if (cycle == 1) {
                 when (scanline) {
-                    241 -> { // start of VBlank
+                    241 -> { // start of VBlank at dot 1
                         setStatusFlag(STATUS_VBLANK)
                         nmiOccurred = true
                     }
-                    261 -> { // pre-render line
+                    261 -> { // pre-render line at dot 1
                         clearStatusFlag(STATUS_VBLANK)
                         writeToggle = false
                         nmiOccurred = false
                     }
-                }
-                if (scanline >= 262) {
-                    scanline = 0
-                    frame++
                 }
             }
 
@@ -129,6 +132,7 @@ class PPU(private val chrRom: ByteArray) {
 
             in PALETTE_START..0x3FFF -> {
                 val mirroredAddr = mirrorPaletteAddr(vramAddr)
+                ppuDataBuffer = nametableRam[mirrorNametableAddr(vramAddr and 0x2FFF)]
                 paletteRam[mirroredAddr].toUByte().toInt()
             }
 
@@ -194,8 +198,7 @@ class PPU(private val chrRom: ByteArray) {
     private fun writePpuData(value: Int) {
         when (vramAddr) {
             in NAMETABLE_START until PALETTE_START -> {
-                val mirrored = (vramAddr - NAMETABLE_START) % NAMETABLE_RAM_SIZE
-                nametableRam[mirrored] = value.toByte()
+                nametableRam[mirrorNametableAddr(vramAddr)] = value.toByte()
             }
 
             in PALETTE_START..0x3FFF -> {
@@ -213,9 +216,15 @@ class PPU(private val chrRom: ByteArray) {
 
     private fun vramIncrement() = if ((control and 0x04) != 0) 32 else 1
 
-    private fun mirrorNametableAddr(addr: Int): Int =
-        // Mirror $2000–$2FFF into 2KB nametable RAM
-        (addr - NAMETABLE_START) % NAMETABLE_RAM_SIZE
+    private fun mirrorNametableAddr(addr: Int): Int {
+        val a = (addr - NAMETABLE_START) and 0x0FFF
+        return when (mirroring) {
+            // Horizontal: $2000/$2400 → bank A, $2800/$2C00 → bank B
+            MirroringMode.HORIZONTAL -> (a / 0x800) * 0x400 + a % 0x400
+            // Vertical: $2000/$2800 → bank A, $2400/$2C00 → bank B
+            MirroringMode.VERTICAL -> a % 0x800
+        }
+    }
 
     private fun mirrorPaletteAddr(addr: Int): Int {
         // Palette space is mirrored every 32 bytes from $3F00–$3FFF
@@ -232,6 +241,12 @@ class PPU(private val chrRom: ByteArray) {
         }
     }
 
+    fun oamDma(data: ByteArray) {
+        for (i in 0 until 256) {
+            oamRam[(oamAddr + i) and 0xFF] = data[i]
+        }
+    }
+
     fun currentFrame() = framebuffer
 
     private fun getTile(tileX: Int, tileY: Int): Array<IntArray> {
@@ -245,31 +260,17 @@ class PPU(private val chrRom: ByteArray) {
     }
 
     private fun getPaletteForTile(tileX: Int, tileY: Int): IntArray {
-        require(tileX in 0 until TILES_PER_ROW * 2 && tileY in 0 until TILES_PER_COL * 2) {
+        require(tileX in 0 until TILES_PER_ROW && tileY in 0 until TILES_PER_COL) {
             "Tile coordinates out of bounds: ($tileX, $tileY)"
         }
 
-        // Determine which nametable this tile is in (0–3)
-        val nametableCol = tileX / TILES_PER_ROW  // 0 or 1
-        val nametableRow = tileY / TILES_PER_COL  // 0 or 1
-        val nametableIndex = nametableRow * 2 + nametableCol  // 0 to 3
-
-        val localTileX = tileX % TILES_PER_ROW
-        val localTileY = tileY % TILES_PER_COL
-        val nametableBase = nametableIndex * NAMETABLE_SIZE
-
-        // Compute attribute table index
-        val attrX = localTileX / 4
-        val attrY = localTileY / 4
-        val attrIndex = attrY * (TILES_PER_ROW / 4) + attrX  // 8 x 8 grid
-        val attrAddr = nametableBase + ATTRTABLE_OFFSET + attrIndex
-
-        val attrByte = nametableRam[attrAddr].toUByte().toInt()
+        val attrIndex = (tileY / 4) * (TILES_PER_ROW / 4) + (tileX / 4)
+        val attrByte = nametableRam[ATTRTABLE_OFFSET + attrIndex].toUByte().toInt()
 
         val shift = when {
-            localTileX % 4 < 2 && localTileY % 4 < 2 -> 0
-            localTileX % 4 >= 2 && localTileY % 4 < 2 -> 2
-            localTileX % 4 < 2 && localTileY % 4 >= 2 -> 4
+            tileX % 4 < 2 && tileY % 4 < 2 -> 0
+            tileX % 4 >= 2 && tileY % 4 < 2 -> 2
+            tileX % 4 < 2 && tileY % 4 >= 2 -> 4
             else -> 6
         }
 

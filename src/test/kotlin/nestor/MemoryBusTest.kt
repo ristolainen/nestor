@@ -54,4 +54,40 @@ class MemoryBusTest : FreeSpec({
         bus.write(0x8000, 0xAB)
         bus.read(0x8000) shouldBe original
     }
+
+    "OAMDMA: writing to \$4014 should copy 256 bytes from the specified CPU page to OAM" {
+        val ppu = PPU(ByteArray(0), MirroringMode.VERTICAL)
+        val cpuRam = ByteArray(0x0800)
+        val oamBus = MemoryBus(ppu = ppu, prgRom = ByteArray(0x4000), cpuRam = cpuRam)
+
+        // Write known data to CPU page 2 ($0200–$02FF)
+        for (i in 0 until 256) {
+            oamBus.write(0x0200 + i, i)
+        }
+
+        ppu.oamAddr = 0x00
+        oamBus.write(0x4014, 0x02)  // DMA from page $02
+
+        for (i in 0 until 256) {
+            ppu.oamRam[i].toUByte().toInt() shouldBe i
+        }
+    }
+
+    "OAMDMA: DMA respects oamAddr offset" {
+        val ppu = PPU(ByteArray(0), MirroringMode.VERTICAL)
+        val cpuRam = ByteArray(0x0800)
+        val oamBus = MemoryBus(ppu = ppu, prgRom = ByteArray(0x4000), cpuRam = cpuRam)
+
+        for (i in 0 until 256) {
+            oamBus.write(0x0300 + i, 0xFF)
+        }
+
+        ppu.oamAddr = 0x10
+        oamBus.write(0x4014, 0x03)
+
+        // First byte written to oamRam[0x10]
+        ppu.oamRam[0x10].toUByte().toInt() shouldBe 0xFF
+        // Wraps around: oamRam[0x0F] gets the last byte
+        ppu.oamRam[0x0F].toUByte().toInt() shouldBe 0xFF
+    }
 })

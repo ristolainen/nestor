@@ -21,6 +21,7 @@ object RomReader {
         val flags6 = rom[6].toInt()
         val flags7 = rom[7].toInt()
         val hasTrainer = (flags6 and 0b00000100) != 0
+        val mirroring = if ((flags6 and 0x01) != 0) MirroringMode.VERTICAL else MirroringMode.HORIZONTAL
 
         val mapperLow = (flags6 shr 4) and 0b00001111
         val mapperHigh = (flags7 shr 4) and 0b00001111
@@ -43,6 +44,7 @@ object RomReader {
                 mapperNumber = mapperNumber,
                 prgSize = prgSize,
                 chrSize = chrSize,
+                mirroring = mirroring,
             ),
             prgData = prgData,
             chrData = chrData,

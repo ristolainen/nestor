@@ -45,6 +45,11 @@ open class MemoryBus(
                 ppu.cpuWrite(mirroredAddr, value)
             }
 
+            0x4014 -> {
+                val base = value shl 8
+                ppu.oamDma(ByteArray(256) { i -> read(base or i).toByte() })
+            }
+
             in 0x8000..0xFFFF -> {
                 // Typically PRG-ROM is read-only; ignore writes
             }
