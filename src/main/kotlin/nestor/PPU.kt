@@ -104,13 +104,22 @@ class PPU(
 
     private fun readPpuData(): Int {
         val result = when (vramAddr) {
+            in 0x0000 until NAMETABLE_START -> {
+                // TODO: Pattern table ($0000–$1FFF) reads should return raw CHR-ROM bytes.
+                // Currently the PPU only holds pre-parsed tile data, not raw bytes.
+                // For now, return the stale buffer and advance — SMB never reads CHR via $2007.
+                val buffered = ppuDataBuffer
+                ppuDataBuffer = 0
+                buffered.toUByte().toInt()
+            }
+
             in PALETTE_START..0x3FFF -> {
                 val mirroredAddr = mirrorPaletteAddr(vramAddr)
                 paletteRam[mirroredAddr].toUByte().toInt()
             }
 
             else -> {
-                val mirroredAddr = mirrorNametableAddr (vramAddr)
+                val mirroredAddr = mirrorNametableAddr(vramAddr)
                 val buffered = ppuDataBuffer
                 ppuDataBuffer = nametableRam[mirroredAddr]
                 buffered.toUByte().toInt()
@@ -181,8 +190,7 @@ class PPU(
             }
 
             else -> {
-                val mirrored = (vramAddr - NAMETABLE_START) % NAMETABLE_RAM_SIZE
-                nametableRam[mirrored] = value.toByte()
+                // TODO: Pattern table ($0000–$1FFF) — CHR-ROM is read-only for NROM; ignore writes.
             }
         }
 

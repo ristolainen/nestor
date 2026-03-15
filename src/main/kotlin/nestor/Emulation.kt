@@ -32,8 +32,8 @@ class Emulation(
         }
     }
 
-    fun runAFewTicks() {
-        println("Running a few ticks")
+    fun runFrames(frames: Int) {
+        println("Running $frames frame(s)")
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
         val traceFile = java.io.File("traces/$timestamp.txt")
         traceFile.parentFile.mkdirs()
@@ -41,7 +41,8 @@ class Emulation(
 
         cpu.reset()
         var cycles = 0
-        while (cycles < 500000) {
+        val limit = 29780 * frames
+        while (cycles < limit) {
             cycles += step()
         }
 
