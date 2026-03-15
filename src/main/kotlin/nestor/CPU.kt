@@ -237,6 +237,7 @@ class CPU(
         Opcode.JMP_ABS -> jmpAbsolute()
         Opcode.JMP_IND -> jmpIndirect()
         Opcode.JSR -> jsr()
+        Opcode.RTI -> rti()
         Opcode.RTS -> rts()
         // Flags
         Opcode.CLC -> clc()
@@ -886,6 +887,13 @@ class CPU(
         push(ret.highByte())
         push(ret.lowByte())
         pc = target
+    }
+
+    private fun rti() = 6.also {
+        status = (pull() and 0xEF) or 0x20
+        val lo = pull()
+        val hi = pull()
+        pc = word(lo, hi)
     }
 
     private fun rts() = 6.also {

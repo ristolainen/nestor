@@ -1887,6 +1887,42 @@ class CPUInstructionTest : FreeSpec({
         )
     }
 
+    // ── RTI ──────────────────────────────────────────────────────────────
+    "RTI implied" - {
+        // RTI: pull P, then pull PC-lo, then pull PC-hi. No +1 on PC (unlike RTS).
+        // P restored as: (pulled & 0xEF) | 0x20 — bit 4 (B) cleared, bit 5 forced set.
+        testStep(
+            "restores flags and PC from stack",
+            Instruction(RTI),
+            CpuSetup()
+                .sp(0xFC)
+                .mem(0x01FD, 0xA1, 0x34, 0xC1), // P=0xA1 (N+C), PC=0xC134
+            // P = (0xA1 & 0xEF) | 0x20 = 0xA1
+            ExpectedStepOutcome(cycles = 6, pc = 0xC134, sp = 0xFF, carry = true, zero = false, negative = true, overflow = false, interrupt = false, decimal = false)
+        )
+        testStep(
+            "B bit cleared in restored status even if set on stack",
+            Instruction(RTI),
+            CpuSetup()
+                .sp(0xFC)
+                .mem(0x01FD, 0xFF, 0x00, 0x80), // P=0xFF (all bits set including B), PC=0x8000
+            // P = (0xFF & 0xEF) | 0x20 = 0xEF
+            ExpectedStepOutcome(cycles = 6, pc = 0x8000, sp = 0xFF, carry = true, zero = true, negative = true, overflow = true, interrupt = true, decimal = true)
+        )
+        testStep(
+            "restores all-clear flags",
+            Instruction(RTI),
+            CpuSetup()
+                .sp(0xFC)
+                .carry(true)
+                .zero(true)
+                .negative(true)
+                .mem(0x01FD, 0x00, 0x50, 0x90), // P=0x00, PC=0x9050
+            // P = (0x00 & 0xEF) | 0x20 = 0x20
+            ExpectedStepOutcome(cycles = 6, pc = 0x9050, sp = 0xFF, carry = false, zero = false, negative = false, interrupt = false)
+        )
+    }
+
     // ── Branches ─────────────────────────────────────────────────────────
     // For each branch: not-taken (2 cycles, pc omitted — fixture checks startAddress+2),
     //                  taken same page (3 cycles, pc = startAddress+2+offset),
