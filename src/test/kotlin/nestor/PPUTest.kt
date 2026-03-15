@@ -6,8 +6,7 @@ import io.kotest.matchers.shouldBe
 class PPUTest : FreeSpec({
     "tick" - {
         "should set VBLANK at the start of scanline 241" {
-            val tile = makeCheckerboardTile()
-            val ppu = PPU(listOf(tile))
+            val ppu = PPU(ByteArray(0))
 
             // Put the PPU right before the wrap that advances to scanline 241.
             ppu.scanline = 240
@@ -21,8 +20,7 @@ class PPUTest : FreeSpec({
         }
 
         "should clear VBLANK on the pre-render line (scanline 261) and reset writeToggle" {
-            val tile = makeCheckerboardTile()
-            val ppu = PPU(listOf(tile))
+            val ppu = PPU(ByteArray(0))
 
             // Force VBLANK on so we can verify it clears at 261.
             ppu.status = ppu.status or STATUS_VBLANK
@@ -39,8 +37,7 @@ class PPUTest : FreeSpec({
         }
 
         "readStatus ($2002) should clear VBLANK and reset the address latch (writeToggle)" {
-            val tile = makeCheckerboardTile()
-            val ppu = PPU(listOf(tile))
+            val ppu = PPU(ByteArray(0))
 
             // Set VBLANK and toggle latch to verify side effects of reading $2002.
             ppu.status = ppu.status or STATUS_VBLANK
@@ -61,8 +58,8 @@ class PPUTest : FreeSpec({
         }
 
         "should render the top left tile using palette 1" {
-            val tile = makeCheckerboardTile().also { printTile(it) }
-            val ppu = PPU(listOf(tile)) // Start with empty RAM
+            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
+            val ppu = PPU(chrRom)
             val memoryBus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // Empty ROM for test
 
             // Set tile 0 at top-left (0,0)
@@ -108,8 +105,8 @@ class PPUTest : FreeSpec({
         }
 
         "should render the bottom right tile using palette 2" {
-            val tile = makeStripedTile().also { printTile(it) }
-            val ppu = PPU(listOf(tile))
+            val chrRom = ChrRomBuilder().tile(0, 0, makeStripeTileData()).build()
+            val ppu = PPU(chrRom)
             val bus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // dummy ROM
 
             val tileX = 31
@@ -166,24 +163,20 @@ class PPUTest : FreeSpec({
     }
 
     "background pattern table selection via PPUCTRL bit 4" - {
-        // Build a tile list with 512 entries: bank 0 = blank tiles, bank 1 = distinct tiles.
-        // tile index 0 in bank 0 → checkerboard; tile index 0 in bank 1 (= tiles[256]) → striped.
-        fun makeBankedTiles(): List<Array<IntArray>> {
-            val tiles = MutableList<Array<IntArray>>(256) { makeBlankTile() }
-            tiles[0] = makeCheckerboardTile()  // bank 0, tile 0
-            tiles.add(makeStripedTile())        // bank 1, tile 0 = index 256
-            return tiles
-        }
+        val bankedChrRom = ChrRomBuilder(banks = 2)
+            .tile(0, 0, makeCheckerboardTileData())
+            .tile(1, 0, makeStripeTileData())
+            .build()
 
-        fun writePpuAddr(ppu: PPU, bus: MemoryBus, addr: Int) {
+        fun writePpuAddr(bus: MemoryBus, addr: Int) {
             bus.write(0x2006, (addr shr 8) and 0xFF)
             bus.write(0x2006, addr and 0xFF)
         }
 
-        fun setupNametableAndPalette(ppu: PPU, bus: MemoryBus) {
-            writePpuAddr(ppu, bus, 0x2000)
+        fun setupNametableAndPalette(bus: MemoryBus) {
+            writePpuAddr(bus, 0x2000)
             bus.write(0x2007, 0x00) // tile index 0 at position (0,0)
-            writePpuAddr(ppu, bus, 0x3F00)
+            writePpuAddr(bus, 0x3F00)
             bus.write(0x2007, 0x0F) // universal bg
             bus.write(0x2007, 0x01) // palette 0 color 1
             bus.write(0x2007, 0x21) // palette 0 color 2
@@ -191,10 +184,10 @@ class PPUTest : FreeSpec({
         }
 
         "PPUCTRL bit 4 = 0 uses bank 0 (tiles 0–255)" {
-            val ppu = PPU(makeBankedTiles())
+            val ppu = PPU(bankedChrRom)
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x00 // bit 4 clear → bank 0
-            setupNametableAndPalette(ppu, bus)
+            setupNametableAndPalette(bus)
 
             ppu.renderFrame()
             val frame = ppu.currentFrame()
@@ -204,10 +197,10 @@ class PPUTest : FreeSpec({
         }
 
         "PPUCTRL bit 4 = 1 uses bank 1 (tiles 256–511)" {
-            val ppu = PPU(makeBankedTiles())
+            val ppu = PPU(bankedChrRom)
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x10 // bit 4 set → bank 1
-            setupNametableAndPalette(ppu, bus)
+            setupNametableAndPalette(bus)
 
             ppu.renderFrame()
             val frame = ppu.currentFrame()
@@ -219,7 +212,7 @@ class PPUTest : FreeSpec({
 
     "cpuRead" - {
         "cpuRead $2002 should return status and clear VBlank and writeToggle" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.status = 0b11100000  // VBlank + sprite flags set
             val result = ppu.cpuRead(0x2002)
 
@@ -229,7 +222,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuRead $2004 should return value at OAMADDR" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.oamRam[5] = 0x42
             ppu.oamAddr = 5
 
@@ -238,7 +231,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuRead $2007 should return buffered value on nametable access" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.nametableRam[0x0000] = 0x12
             ppu.nametableRam[0x0001] = 0x34
             ppu.vramAddr = 0x2000
@@ -254,7 +247,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuRead $2007 should return actual palette value immediately" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.vramAddr = 0x3F00
             ppu.paletteRam[0x00] = 0x3C
 
@@ -263,7 +256,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuRead $2007 should increment and wrap vramAddr" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.vramAddr = 0x3FFF
             ppu.paletteRam[0x1F] = 0x21
 
@@ -274,7 +267,7 @@ class PPUTest : FreeSpec({
 
     "cpuWrite" - {
         "cpuWrite $2000 should set control and update bits 10–11 of tempAddr" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.cpuWrite(0x2000, 0b00000011)
 
             ppu.control shouldBe 0b00000011
@@ -282,21 +275,21 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2001 should set mask register" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.cpuWrite(0x2001, 0x3F)
 
             ppu.mask shouldBe 0x3F
         }
 
         "cpuWrite $2003 should set oamAddr" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.cpuWrite(0x2003, 0x42)
 
             ppu.oamAddr shouldBe 0x42
         }
 
         "cpuWrite $2004 should write to OAM at oamAddr and increment it" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.oamAddr = 0x10
             ppu.cpuWrite(0x2004, 0xAB)
 
@@ -305,7 +298,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2005 should write fineX and coarseX on first write" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.writeToggle = false
             ppu.cpuWrite(0x2005, 0b10100101)
 
@@ -316,7 +309,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2005 should write coarseY and fineY on second write" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.writeToggle = true
             ppu.cpuWrite(0x2005, 0b01110110)
 
@@ -327,7 +320,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2006 should write high byte of tempAddr on first write" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.writeToggle = false
             ppu.cpuWrite(0x2006, 0x3F)
 
@@ -336,7 +329,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2006 should write low byte and set vramAddr on second write" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.writeToggle = true
             ppu.tempAddr = 0x3F00
             ppu.cpuWrite(0x2006, 0x10)
@@ -347,7 +340,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2007 should write to nametableRam and increment vramAddr" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.vramAddr = 0x2000
             ppu.cpuWrite(0x2007, 0x99)
 
@@ -356,7 +349,7 @@ class PPUTest : FreeSpec({
         }
 
         "cpuWrite $2007 should write to paletteRam with mirrored address" {
-            val ppu = PPU(emptyList())
+            val ppu = PPU(ByteArray(0))
             ppu.vramAddr = 0x3F10
             ppu.cpuWrite(0x2007, 0x0F)
 

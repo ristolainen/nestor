@@ -343,7 +343,18 @@ class CpuFixture(
     )
 }
 
-fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(emptyList())): CpuFixture {
+class ChrRomBuilder(banks: Int = 1) {
+    private val data = ByteArray(banks * 256 * 16)
+
+    fun tile(bank: Int, tileId: Int, tileData: ByteArray) = apply {
+        require(tileData.size == 16) { "Tile data must be 16 bytes" }
+        tileData.copyInto(data, destinationOffset = (bank * 256 + tileId) * 16)
+    }
+
+    fun build(): ByteArray = data
+}
+
+fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(ByteArray(0))): CpuFixture {
     val prgRom = ByteArray(0x4000)
     val offset = address - 0x8000
     instruction.bytes.forEachIndexed { i, b -> prgRom[offset + i] = b.toByte() }

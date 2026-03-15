@@ -19,9 +19,8 @@ const val PALETTE_START = 0x3F00
 const val STATUS_VBLANK = 0b10000000
 const val CTRL_BG_PATTERN_TABLE = 0x10
 
-class PPU(
-    val tiles: List<Array<IntArray>>,
-) {
+class PPU(private val chrRom: ByteArray) {
+    private val tiles = TileParser.parseTiles(chrRom)
     internal val nametableRam: ByteArray = ByteArray(NAMETABLE_RAM_SIZE)
     internal val paletteRam: ByteArray = ByteArray(PALETTE_RAM_SIZE)
     internal val oamRam: ByteArray = ByteArray(OAM_RAM_SIZE)

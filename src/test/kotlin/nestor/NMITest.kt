@@ -39,11 +39,7 @@ class NMITest : FreeSpec({
         prg[0x3FFA] = 0x00; prg[0x3FFB] = 0x90.toByte() // NMI vector -> $9000
         prg[0x3FFC] = 0x00; prg[0x3FFD] = 0x80.toByte() // RESET vector -> $8000
 
-        // --- Minimal PPU tiles (we never render, but constructor needs them) -------------------
-        // 256 blank tiles is fine
-        fun blankTile() = Array(8) { IntArray(8) }
-        val tiles: List<Array<IntArray>> = List(256) { blankTile() }
-        val ppu = PPU(tiles)
+        val ppu = PPU(ByteArray(0))
 
         // --- CPU + MemoryBus -------------------------------------------------------------------
         val mem = MemoryBus(ppu, prg)

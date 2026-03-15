@@ -9,8 +9,7 @@ fun main() {
     // val rom = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
     val inesRom = RomReader.read(rom)
 
-    val tiles = TileParser.parseTiles(inesRom.chrData)
-    val ppu = PPU(tiles)
+    val ppu = PPU(inesRom.chrData)
     val memoryBus = MemoryBus(ppu, inesRom.prgData)
     //fakePalette(memoryBus)
     //fakeNameTables(memoryBus)
