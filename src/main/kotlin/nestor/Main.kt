@@ -17,14 +17,10 @@ fun main() {
     val screen = ScreenRenderer()
     displayScreen(screen)
 
-    //ppu.renderFrame()
-    //screen.draw(ppu.currentFrame())
-
     val cpu = CPU(memoryBus)
     val emulation = Emulation(cpu, ppu, memoryBus)
     emulation.runFrames(32)
 
-    ppu.renderFrame()
     screen.draw(ppu.currentFrame())
 }
 

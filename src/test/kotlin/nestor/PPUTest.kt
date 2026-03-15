@@ -37,117 +37,6 @@ class PPUTest : FreeSpec({
         }
     }
 
-    "renderFrame" - {
-        fun writePpuAddr(memoryBus: MemoryBus, addr: Int) {
-            memoryBus.write(0x2006, (addr shr 8) and 0xFF)
-            memoryBus.write(0x2006, addr and 0xFF)
-        }
-
-        "should render the top left tile using palette 1" {
-            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
-            val ppu = PPU(chrRom)
-            val memoryBus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // Empty ROM for test
-
-            // Set tile 0 at top-left (0,0)
-            writePpuAddr(memoryBus, 0x2000)
-            memoryBus.write(0x2007, 0x00)
-
-            // Set attribute byte for top-left quadrant of nametable (palette 1)
-            writePpuAddr(memoryBus, 0x23C0)
-            memoryBus.write(0x2007, 0b00000001)
-
-            // Palette 1 setup — universal background color at $3F00, palette 1 at $3F04–$3F06
-            writePpuAddr(memoryBus, 0x3F00)
-            memoryBus.write(0x2007, 0x0F) // universal BG
-            // Palette 1 → $3F04–$3F06
-            writePpuAddr(memoryBus, 0x3F04)
-            memoryBus.write(0x2007, 0x01) // color 1
-            memoryBus.write(0x2007, 0x21) // color 2
-            memoryBus.write(0x2007, 0x31) // color 3
-
-            ppu.renderFrame()
-            val frame = ppu.currentFrame()
-
-            printAnsiTile(frame, 0, 0)
-
-            val actualTile = (0 until 8).flatMap { y ->
-                (0 until 8).map { x ->
-                    frame[y * FRAME_WIDTH + x]
-                }
-            }
-
-            val expectedTile = listOf(
-                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
-                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
-                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
-                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
-                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
-                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
-                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
-                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01
-            ).map { nesPalette[it] }
-
-            actualTile shouldBe expectedTile
-        }
-
-        "should render the bottom right tile using palette 2" {
-            val chrRom = ChrRomBuilder().tile(0, 0, makeStripeTileData()).build()
-            val ppu = PPU(chrRom)
-            val bus = MemoryBus(ppu, prgRom = ByteArray(0x4000)) // dummy ROM
-
-            val tileX = 31
-            val tileY = 29
-            val tileIndex = tileY * TILES_PER_ROW + tileX
-
-            // Write tile 0 at bottom-right position in nametable
-            writePpuAddr(bus, 0x2000 + tileIndex)
-            bus.write(0x2007, 0x00)
-
-            // Write attribute byte for the (31, 29) tile's 32x32 region
-            val attrIndex = (tileY / 4) * 8 + (tileX / 4) // 8x8 attribute grid
-            val attrAddr = 0x23C0 + attrIndex
-            bus.write(0x2006, (attrAddr shr 8) and 0xFF)
-            bus.write(0x2006, attrAddr and 0xFF)
-            bus.write(0x2007, 0b00001000) // palette 2 in bottom-right quadrant (bits 6–7)
-
-            // Write palette RAM for palette 2: $3F00 + 1 + (2 * 3) = $3F07–$3F09
-            writePpuAddr(bus, 0x3F00)
-            bus.write(0x2007, 0x0F) // universal bg color
-            writePpuAddr(bus, 0x3F07)
-            bus.write(0x2007, 0x11) // $3F07 – Palette 2 color 1
-            bus.write(0x2007, 0x21) // $3F08 – Palette 2 color 2
-            bus.write(0x2007, 0x31) // $3F09 – Palette 2 color 3
-
-            ppu.renderFrame()
-            val frame = ppu.currentFrame()
-
-            val pxOffset = tileX * TILE_WIDTH
-            val pyOffset = tileY * TILE_HEIGHT
-
-            printAnsiTile(frame, tileX, tileY)
-
-            val actualTile = (0 until 8).flatMap { y ->
-                (0 until 8).map { x ->
-                    frame[(pyOffset + y) * FRAME_WIDTH + (pxOffset + x)]
-                }
-            }
-
-            val expectedIndices = List(8) {
-                listOf(3, 2, 3, 2, 3, 2, 3, 2)
-            }.flatten()
-
-            val expectedTile = expectedIndices.map { colorIndex ->
-                when (colorIndex) {
-                    2 -> nesPalette[0x21] // Palette color 2
-                    3 -> nesPalette[0x31] // Palette color 3
-                    else -> error("This test should only include color indices 2 and 3")
-                }
-            }
-
-            actualTile shouldBe expectedTile
-        }
-    }
-
     "background pattern table selection via PPUCTRL bit 4" - {
         val bankedChrRom = ChrRomBuilder(banks = 2)
             .tile(0, 0, makeCheckerboardTileData())
@@ -173,9 +62,10 @@ class PPUTest : FreeSpec({
             val ppu = PPU(bankedChrRom)
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x00 // bit 4 clear → bank 0
+            ppu.mask = MASK_BG_ENABLE
             setupNametableAndPalette(bus)
 
-            ppu.renderFrame()
+            ppu.tick(240 * 341)
             val frame = ppu.currentFrame()
 
             // Bank 0 tile 0 = checkerboard: pixel (0,0) has color index 1
@@ -186,9 +76,10 @@ class PPUTest : FreeSpec({
             val ppu = PPU(bankedChrRom)
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x10 // bit 4 set → bank 1
+            ppu.mask = MASK_BG_ENABLE
             setupNametableAndPalette(bus)
 
-            ppu.renderFrame()
+            ppu.tick(240 * 341)
             val frame = ppu.currentFrame()
 
             // Bank 1 tile 0 = striped: pixel (0,0) has color index 3
@@ -391,6 +282,101 @@ class PPUTest : FreeSpec({
             ppu.cpuRead(0x2007)
 
             ppu.vramAddr shouldBe 0x2020
+        }
+    }
+
+    "tick-based rendering" - {
+        fun writePpuAddr(bus: MemoryBus, addr: Int) {
+            bus.write(0x2006, (addr shr 8) and 0xFF)
+            bus.write(0x2006, addr and 0xFF)
+        }
+
+        // Ticking through all 240 visible scanlines (each 341 dots) fills the framebuffer.
+        val VISIBLE_FRAME_CYCLES = 240 * 341
+
+        "should produce correct pixels after ticking through 240 visible scanlines" {
+            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
+            val ppu = PPU(chrRom)
+            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            ppu.mask = MASK_BG_ENABLE
+
+            writePpuAddr(bus, 0x2000)
+            bus.write(0x2007, 0x00)             // tile 0 at top-left
+            writePpuAddr(bus, 0x23C0)
+            bus.write(0x2007, 0b00000001)       // palette 1 for top-left quadrant
+            writePpuAddr(bus, 0x3F00)
+            bus.write(0x2007, 0x0F)             // universal bg color
+            writePpuAddr(bus, 0x3F04)
+            bus.write(0x2007, 0x01)             // palette 1 color 1
+            bus.write(0x2007, 0x21)             // palette 1 color 2
+            bus.write(0x2007, 0x31)             // palette 1 color 3
+
+            ppu.tick(VISIBLE_FRAME_CYCLES)
+
+            val frame = ppu.currentFrame()
+            val actualTile = (0 until 8).flatMap { y ->
+                (0 until 8).map { x -> frame[y * FRAME_WIDTH + x] }
+            }
+            val expectedTile = listOf(
+                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
+                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
+                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
+                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
+                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
+                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01,
+                0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F,
+                0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01, 0x0F, 0x01
+            ).map { nesPalette[it] }
+
+            actualTile shouldBe expectedTile
+        }
+
+        "should render incrementally — only ticked scanlines appear in the framebuffer" {
+            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
+            val ppu = PPU(chrRom)
+            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            ppu.mask = MASK_BG_ENABLE
+
+            // Fill all 32×30 nametable positions with tile 0
+            writePpuAddr(bus, 0x2000)
+            repeat(TILES_PER_ROW * TILES_PER_COL) { bus.write(0x2007, 0x00) }
+            writePpuAddr(bus, 0x3F00)
+            bus.write(0x2007, 0x0F)             // universal bg color
+            bus.write(0x2007, 0x01)             // palette 0 color 1
+
+            // Tick through only the first 5 scanlines
+            ppu.tick(5 * 341)
+
+            val frame = ppu.currentFrame()
+
+            // Rows 0–4 should have been drawn (non-zero pixels from the tile)
+            val renderedRows = (0 until 5).flatMap { y ->
+                (0 until FRAME_WIDTH).map { x -> frame[y * FRAME_WIDTH + x] }
+            }
+            renderedRows.any { it != 0 } shouldBe true
+
+            // Row 5 and below should still be untouched (zero-initialised)
+            val unrenderedRows = (5 until FRAME_HEIGHT).flatMap { y ->
+                (0 until FRAME_WIDTH).map { x -> frame[y * FRAME_WIDTH + x] }
+            }
+            unrenderedRows.all { it == 0 } shouldBe true
+        }
+
+        "should not render when PPUMASK background enable bit is clear" {
+            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
+            val ppu = PPU(chrRom)
+            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            // mask left at 0 — background rendering disabled
+
+            writePpuAddr(bus, 0x2000)
+            bus.write(0x2007, 0x00)             // tile 0 at top-left
+            writePpuAddr(bus, 0x3F00)
+            bus.write(0x2007, 0x0F)             // universal bg color
+
+            ppu.tick(VISIBLE_FRAME_CYCLES)
+
+            val frame = ppu.currentFrame()
+            frame.all { it == 0 } shouldBe true
         }
     }
 })

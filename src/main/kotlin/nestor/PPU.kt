@@ -18,6 +18,7 @@ const val PALETTE_START = 0x3F00
 
 const val STATUS_VBLANK = 0b10000000
 const val CTRL_BG_PATTERN_TABLE = 0x10
+const val MASK_BG_ENABLE = 0x08
 
 class PPU(private val chrRom: ByteArray) {
     private val tiles = TileParser.parseTiles(chrRom)
@@ -66,7 +67,24 @@ class PPU(private val chrRom: ByteArray) {
                     frame++
                 }
             }
+
+            // Dots 1–256 of visible scanlines (0–239) produce one pixel each.
+            // cycle - 1 maps dot 1 → x=0, dot 256 → x=255.
+            if (scanline < FRAME_HEIGHT
+                && cycle in 1..FRAME_WIDTH
+                && (mask and MASK_BG_ENABLE) != 0
+            ) {
+                renderPixel(cycle - 1, scanline)
+            }
         }
+    }
+
+    private fun renderPixel(x: Int, y: Int) {
+        val tileX = x / TILE_WIDTH
+        val tileY = y / TILE_HEIGHT
+        val tile = getTile(tileX, tileY)
+        val palette = getPaletteForTile(tileX, tileY)
+        framebuffer[y * FRAME_WIDTH + x] = palette[tile[y % TILE_HEIGHT][x % TILE_WIDTH]]
     }
 
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
@@ -214,33 +232,7 @@ class PPU(private val chrRom: ByteArray) {
         }
     }
 
-    /**
-     * Renders the visible 256x240 frame using nametable 0 (top-left).
-     * Does not include scrolling or mirroring logic yet.
-     */
-    fun renderFrame() {
-        for (tileY in 0 until TILES_PER_COL) {
-            for (tileX in 0 until TILES_PER_ROW) {
-                renderTile(tileX, tileY)
-            }
-        }
-    }
-
     fun currentFrame() = framebuffer
-
-    private fun renderTile(tileX: Int, tileY: Int) {
-        val tile = getTile(tileX, tileY)
-        val palette = getPaletteForTile(tileX, tileY)
-        for (y in 0 until TILE_HEIGHT) {
-            for (x in 0 until TILE_WIDTH) {
-                val colorIndex = tile[y][x]
-                val color = palette[colorIndex]
-                val px = (tileX * TILE_WIDTH) + x
-                val py = (tileY * TILE_HEIGHT) + y
-                framebuffer[py * FRAME_WIDTH + px] = color
-            }
-        }
-    }
 
     private fun getTile(tileX: Int, tileY: Int): Array<IntArray> {
         require(tileX in 0 until TILES_PER_ROW && tileY in 0 until TILES_PER_COL) {
