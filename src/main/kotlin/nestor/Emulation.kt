@@ -1,5 +1,6 @@
 package nestor
 
+import java.io.File
 import java.io.PrintWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -15,6 +16,7 @@ class Emulation(
     val cpu: CPU,
     val ppu: PPU,
     val memoryBus: MemoryBus,
+    val screen: ScreenRenderer,
 ) {
     private var traceWriter: PrintWriter? = null
 
@@ -23,18 +25,10 @@ class Emulation(
         cpu.reset()
     }
 
-    fun runFrame() {
-        println("Running one frame")
-        var cycles = 0
-        while (cycles < 29780) {
-            cycles += step()
-        }
-    }
-
     fun runFrames(frames: Int) {
         println("Running $frames frame(s)")
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-        val traceFile = java.io.File("traces/$timestamp.txt")
+        val traceFile = File("traces/$timestamp.txt")
         traceFile.parentFile.mkdirs()
         traceWriter = PrintWriter(traceFile)
 
@@ -60,6 +54,10 @@ class Emulation(
         traceWriter?.println(line)
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)
+        if (ppu.frameReady) {
+            screen.draw(ppu.currentFrame())
+            ppu.frameReady = false
+        }
         cpu.pollNmi()
         return cpuCycles
     }

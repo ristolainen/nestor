@@ -44,6 +44,7 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     internal var frame: Long = 0
     internal var nmiOutput = false
     internal var nmiOccurred = false
+    var frameReady = false
 
     fun tick(cycles: Int) {
         repeat(cycles) {
@@ -62,6 +63,7 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
                     241 -> { // start of VBlank at dot 1
                         setStatusFlag(STATUS_VBLANK)
                         nmiOccurred = true
+                        frameReady = true
                     }
                     261 -> { // pre-render line at dot 1
                         clearStatusFlag(STATUS_VBLANK)

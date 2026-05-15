@@ -18,10 +18,8 @@ fun main() {
     displayScreen(screen)
 
     val cpu = CPU(memoryBus)
-    val emulation = Emulation(cpu, ppu, memoryBus)
+    val emulation = Emulation(cpu, ppu, memoryBus, screen)
     emulation.runFrames(40)
-
-    screen.draw(ppu.currentFrame())
 }
 
 private fun displayScreen(screen: ScreenRenderer) {

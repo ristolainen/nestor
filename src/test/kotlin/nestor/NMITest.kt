@@ -49,7 +49,7 @@ class NMITest : FreeSpec({
         // --- Emulation wrapper -----------------------------------------------------------------
         // Emulation.step() executes exactly 1 CPU instruction, advances the PPU
         // by cycles*3, and polls/dispatches NMI between instructions.
-        val emu = Emulation(cpu, ppu, mem)
+        val emu = Emulation(cpu, ppu, mem, ScreenRenderer())
 
         // --- Run until the NMI handler stores the sentinel to $0002 ---------------------------
         // Hitting VBlank: 241 scanlines * 341 PPU dots ≈ 82,281 PPU cycles.
