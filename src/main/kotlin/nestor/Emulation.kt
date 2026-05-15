@@ -1,10 +1,5 @@
 package nestor
 
-import java.io.File
-import java.io.PrintWriter
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-
 /**
  * ⏱ Timing math:
  *  - NES runs at 1.79 MHz → ~29780 CPU cycles per 1/60 sec frame
@@ -17,9 +12,8 @@ class Emulation(
     val ppu: PPU,
     val memoryBus: MemoryBus,
     val screen: ScreenRenderer,
+    private val tracer: Tracer = NullTracer,
 ) {
-    private var traceWriter: PrintWriter? = null
-
     fun run() {
         println("Nestor NES Emulator starting...")
         cpu.reset()
@@ -27,31 +21,21 @@ class Emulation(
 
     fun runFrames(frames: Int) {
         println("Running $frames frame(s)")
-        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-        val traceFile = File("traces/$timestamp.txt")
-        traceFile.parentFile.mkdirs()
-        traceWriter = PrintWriter(traceFile)
-
         cpu.reset()
         var cycles = 0
         val limit = 29780 * frames
         while (cycles < limit) {
             cycles += step()
         }
-
-        traceWriter?.close()
-        traceWriter = null
-        println("Trace saved to ${traceFile.path}")
+        tracer.close()
     }
 
     internal fun step(): Int {
         if (cpu.abort) {
-            traceWriter?.close()
+            tracer.close()
             System.exit(0)
         }
-        val line = cpu.traceLine()
-        println(line)
-        traceWriter?.println(line)
+        tracer.trace(cpu.traceLine())
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)
         if (ppu.frameReady) {

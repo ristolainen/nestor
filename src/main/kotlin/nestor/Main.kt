@@ -18,8 +18,9 @@ fun main() {
     displayScreen(screen)
 
     val cpu = CPU(memoryBus)
-    val emulation = Emulation(cpu, ppu, memoryBus, screen)
-    emulation.runFrames(40)
+    val tracer = NullTracer
+    val emulation = Emulation(cpu, ppu, memoryBus, screen, tracer)
+    emulation.runFrames(1000)
 }
 
 private fun displayScreen(screen: ScreenRenderer) {
