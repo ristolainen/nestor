@@ -359,6 +359,185 @@ class PPUTest : FreeSpec({
         }
     }
 
+    "calculatePixel" - {
+        "returns background color when sprites are disabled" {
+            val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE // sprites disabled
+
+            // Nametable: tile 0 at position (0,0)
+            ppu.nametableRam[0] = 0x00
+
+            // Background palette 0: universal bg = 0x0F, color 1 = 0x01
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[1] = 0x01
+
+            // Checkerboard tile: pixel (0,0) has color index 1
+            ppu.calculatePixel(0, 0) shouldBe nesPalette[0x01]
+            // Pixel (1,0) has color index 0 (transparent = universal bg)
+            ppu.calculatePixel(1, 0) shouldBe nesPalette[0x0F]
+        }
+
+        "sprite in front of background shows sprite color, transparent center shows background" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData()) // BG tile
+                .tile(0, 1, makeFrameSpriteTileData())  // sprite tile: border opaque, center transparent
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            // BG: tile 0 at position (0,0), palette 0
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F // universal bg
+            ppu.paletteRam[1] = 0x01 // bg palette 0 color 1
+
+            // Sprite palette 0: paletteRam[0x11–0x13]
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0 at (0, 0): Y=0 visible on scanline 1, tile 1, in front
+            ppu.oamRam[0] = (0x00).toByte() // Y
+            ppu.oamRam[1] = (0x01).toByte() // tile id
+            ppu.oamRam[2] = (0x00).toByte() // attributes: palette 0, in front, no flip
+            ppu.oamRam[3] = (0x00).toByte() // X
+
+            // (0, 1) is on the opaque border → sprite color wins
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x16]
+
+            // (3, 3) is in the transparent center → background shows through
+            // Checkerboard at (3, 3): (3+3) % 2 == 0 → color index 1
+            ppu.calculatePixel(3, 3) shouldBe nesPalette[0x01]
+        }
+
+        "sprite behind background shows background when BG is opaque, sprite when BG is transparent" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData()) // BG tile: alternates index 1 and 0
+                .tile(0, 1, makeFrameSpriteTileData())  // sprite tile
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F // universal bg
+            ppu.paletteRam[1] = 0x01 // bg palette 0 color 1
+
+            ppu.paletteRam[0x11] = 0x16 // sprite palette 0 color 1
+
+            // Sprite 0: behind background (attribute bit 5 set)
+            ppu.oamRam[0] = (0x00).toByte() // Y
+            ppu.oamRam[1] = (0x01).toByte() // tile id
+            ppu.oamRam[2] = (0x20).toByte() // attributes: behind BG
+            ppu.oamRam[3] = (0x00).toByte() // X
+
+            // (1, 1) border pixel: BG checkerboard at row 1 col 1 → index 1 (opaque)
+            // → BG wins because sprite is behind and BG is opaque
+            ppu.calculatePixel(1, 1) shouldBe nesPalette[0x01]
+
+            // (0, 1) border pixel: BG checkerboard at row 1 col 0 → index 0 (transparent)
+            // → sprite shows through because BG is transparent
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x16]
+        }
+
+        "horizontal flip mirrors sprite pixels" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeBlankTileData())      // blank BG
+                .tile(0, 1, makeCornerDotTileData())   // dot at top-left only
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0 at (0,0), horizontal flip
+            ppu.oamRam[0] = (0x00).toByte()
+            ppu.oamRam[1] = (0x01).toByte()
+            ppu.oamRam[2] = (0x40).toByte() // H-flip
+            ppu.oamRam[3] = (0x00).toByte()
+
+            // Without flip the dot is at (0, 1). With H-flip it moves to (7, 1).
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x0F] // was opaque, now transparent
+            ppu.calculatePixel(7, 1) shouldBe nesPalette[0x16] // was transparent, now opaque
+        }
+
+        "vertical flip mirrors sprite pixels" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeBlankTileData())
+                .tile(0, 1, makeCornerDotTileData())
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0 at (0,0), vertical flip
+            ppu.oamRam[0] = (0x00).toByte()
+            ppu.oamRam[1] = (0x01).toByte()
+            ppu.oamRam[2] = (0x80).toByte() // V-flip
+            ppu.oamRam[3] = (0x00).toByte()
+
+            // Without flip the dot is at (0, 1) (row 0 of sprite = scanline 1).
+            // With V-flip it moves to (0, 8) (row 7 of sprite = scanline 8).
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x0F] // was opaque, now transparent
+            ppu.calculatePixel(0, 8) shouldBe nesPalette[0x16] // was transparent, now opaque
+        }
+
+        "lower OAM index sprite wins when two sprites overlap" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeBlankTileData())
+                .tile(0, 1, makeFrameSpriteTileData()) // sprite tile for both sprites
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+            ppu.paletteRam[0] = 0x0F
+
+            // Sprite palette 0 and 1 with distinct colors
+            ppu.paletteRam[0x11] = 0x16 // palette 0 color 1
+            ppu.paletteRam[0x15] = 0x26 // palette 1 color 1
+
+            // Sprite 0: palette 0, at (0,0)
+            ppu.oamRam[0] = (0x00).toByte()
+            ppu.oamRam[1] = (0x01).toByte()
+            ppu.oamRam[2] = (0x00).toByte() // palette 0
+            ppu.oamRam[3] = (0x00).toByte()
+
+            // Sprite 1: palette 1, also at (0,0)
+            ppu.oamRam[4] = (0x00).toByte()
+            ppu.oamRam[5] = (0x01).toByte()
+            ppu.oamRam[6] = (0x01).toByte() // palette 1
+            ppu.oamRam[7] = (0x00).toByte()
+
+            // Both sprites cover (0,1) — sprite 0 (palette 0) wins
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x16]
+        }
+
+        "PPUCTRL bit 3 selects sprite pattern table" {
+            val chrRom = ChrRomBuilder(banks = 2)
+                .tile(0, 0, makeBlankTileData())        // blank BG in bank 0
+                .tile(0, 1, makeCornerDotTileData())    // bank 0 sprite tile: dot at top-left
+                .tile(1, 1, makeFrameSpriteTileData())  // bank 1 sprite tile: frame border
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0: tile 1 at (0,0)
+            ppu.oamRam[0] = (0x00).toByte()
+            ppu.oamRam[1] = (0x01).toByte()
+            ppu.oamRam[2] = (0x00).toByte()
+            ppu.oamRam[3] = (0x00).toByte()
+
+            // PPUCTRL bit 3 = 0 → bank 0: corner dot tile, only (0,1) is opaque
+            ppu.control = 0x00
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x16] // opaque dot
+            ppu.calculatePixel(1, 1) shouldBe nesPalette[0x0F] // transparent
+
+            // PPUCTRL bit 3 = 1 → bank 1: frame tile, (0,1) and (1,1) both opaque border
+            ppu.control = CTRL_SPRITE_PATTERN_TABLE
+            ppu.calculatePixel(0, 1) shouldBe nesPalette[0x16] // opaque border
+            ppu.calculatePixel(1, 1) shouldBe nesPalette[0x16] // opaque border
+        }
+    }
+
     "tick-based rendering" - {
         fun writePpuAddr(bus: MemoryBus, addr: Int) {
             bus.write(0x2006, (addr shr 8) and 0xFF)

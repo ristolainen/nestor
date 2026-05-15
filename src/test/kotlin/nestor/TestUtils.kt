@@ -63,6 +63,51 @@ fun makeStripedTile() = Array(8) {
 }
 
 /**
+ * Creates a "frame" sprite tile (8x8): color index 1 around the border,
+ * color index 0 (transparent) in the 4x4 center.
+ *
+ *   1 1 1 1 1 1 1 1
+ *   1 1 1 1 1 1 1 1
+ *   1 1 0 0 0 0 1 1
+ *   1 1 0 0 0 0 1 1
+ *   1 1 0 0 0 0 1 1
+ *   1 1 0 0 0 0 1 1
+ *   1 1 1 1 1 1 1 1
+ *   1 1 1 1 1 1 1 1
+ */
+fun makeFrameSpriteTileData(): ByteArray {
+    val tile = ByteArray(16)
+    // Plane 0: low bit — 1 for opaque border, 0 for transparent center
+    tile[0] = 0b11111111.toByte() // row 0: all opaque
+    tile[1] = 0b11111111.toByte() // row 1: all opaque
+    tile[2] = 0b11000011.toByte() // row 2: border only
+    tile[3] = 0b11000011.toByte() // row 3
+    tile[4] = 0b11000011.toByte() // row 4
+    tile[5] = 0b11000011.toByte() // row 5
+    tile[6] = 0b11111111.toByte() // row 6: all opaque
+    tile[7] = 0b11111111.toByte() // row 7: all opaque
+    // Plane 1: high bit — all 0, so opaque pixels are color index 1
+    return tile
+}
+
+/**
+ * Creates a blank tile as raw CHR-ROM data (16 bytes, all zero).
+ */
+fun makeBlankTileData(): ByteArray = ByteArray(16)
+
+/**
+ * Creates a "corner dot" sprite tile (8x8): only the top-left pixel
+ * (row 0, col 0) is opaque (color index 1), everything else is transparent.
+ * Useful for testing flips since it's fully asymmetric.
+ */
+fun makeCornerDotTileData(): ByteArray {
+    val tile = ByteArray(16)
+    tile[0] = 0b10000000.toByte() // plane 0 row 0: only bit 7 (col 0) set
+    // plane 1 all zeros → color index 1 at (0,0), 0 everywhere else
+    return tile
+}
+
+/**
  * Creates a blank tile (8x8) where all color indices are 0.
  */
 fun makeBlankTile() = Array(8) { IntArray(8) { 0 } }

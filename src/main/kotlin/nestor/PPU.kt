@@ -19,6 +19,8 @@ const val PALETTE_START = 0x3F00
 const val STATUS_VBLANK = 0b10000000
 const val CTRL_BG_PATTERN_TABLE = 0x10
 const val MASK_BG_ENABLE = 0x08
+const val MASK_SPRITE_ENABLE = 0x10
+const val CTRL_SPRITE_PATTERN_TABLE = 0x08
 
 class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     private val tiles = TileParser.parseTiles(chrRom)
@@ -85,11 +87,27 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     }
 
     private fun renderPixel(x: Int, y: Int) {
+        framebuffer[y * FRAME_WIDTH + x] = calculatePixel(x, y)
+    }
+
+    internal fun calculatePixel(x: Int, y: Int): Int {
         val tileX = x / TILE_WIDTH
         val tileY = y / TILE_HEIGHT
-        val tile = getTile(tileX, tileY)
-        val palette = getPaletteForTile(tileX, tileY)
-        framebuffer[y * FRAME_WIDTH + x] = palette[tile[y % TILE_HEIGHT][x % TILE_WIDTH]]
+        val bgTile = getTile(tileX, tileY)
+        val bgPalette = getPaletteForTile(tileX, tileY)
+        val bgColorIndex = bgTile[y % TILE_HEIGHT][x % TILE_WIDTH]
+
+        val sprite = if ((mask and MASK_SPRITE_ENABLE) != 0) spriteAt(x, y) else null
+
+        return when {
+            sprite == null -> bgPalette[bgColorIndex]
+            sprite.behindBackground && bgColorIndex != 0 -> bgPalette[bgColorIndex]
+            else -> {
+                val row = y - (sprite.y + 1)
+                val col = x - sprite.x
+                getSpritePalette(sprite.palette)[spriteColorIndex(sprite, row, col)]
+            }
+        }
     }
 
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
@@ -297,6 +315,59 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
             nesPalette[color1Index],
             nesPalette[color2Index],
             nesPalette[color3Index],
+        )
+    }
+
+    internal data class Sprite(
+        val x: Int,
+        val y: Int,
+        val tileId: Int,
+        val palette: Int,
+        val flipH: Boolean,
+        val flipV: Boolean,
+        val behindBackground: Boolean,
+    )
+
+    internal fun getSprite(index: Int): Sprite {
+        val base = index * 4
+        return Sprite(
+            x = oamRam[base + 3].toUByte().toInt(),
+            y = oamRam[base].toUByte().toInt(),
+            tileId = oamRam[base + 1].toUByte().toInt(),
+            palette = oamRam[base + 2].toUByte().toInt() and 0x03,
+            flipH = (oamRam[base + 2].toInt() and 0x40) != 0,
+            flipV = (oamRam[base + 2].toInt() and 0x80) != 0,
+            behindBackground = (oamRam[base + 2].toInt() and 0x20) != 0,
+        )
+    }
+
+    internal fun spriteAt(x: Int, y: Int): Sprite? {
+        for (i in 0 until 64) {
+            val sprite = getSprite(i)
+            val row = y - (sprite.y + 1)
+            val col = x - sprite.x
+            if (row in 0 until 8 && col in 0 until 8) {
+                val colorIndex = spriteColorIndex(sprite, row, col)
+                if (colorIndex != 0) return sprite
+            }
+        }
+        return null
+    }
+
+    internal fun spriteColorIndex(sprite: Sprite, row: Int, col: Int): Int {
+        val tileRow = if (sprite.flipV) 7 - row else row
+        val tileCol = if (sprite.flipH) 7 - col else col
+        val spritePatternOffset = if ((control and CTRL_SPRITE_PATTERN_TABLE) != 0) 256 else 0
+        return tiles[spritePatternOffset + sprite.tileId][tileRow][tileCol]
+    }
+
+    private fun getSpritePalette(paletteIndex: Int): IntArray {
+        val base = 0x10 + paletteIndex * 4
+        return intArrayOf(
+            0,
+            nesPalette[paletteRam[base + 1].toUByte().toInt() and 0x3F],
+            nesPalette[paletteRam[base + 2].toUByte().toInt() and 0x3F],
+            nesPalette[paletteRam[base + 3].toUByte().toInt() and 0x3F],
         )
     }
 
