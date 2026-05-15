@@ -21,6 +21,7 @@ const val CTRL_BG_PATTERN_TABLE = 0x10
 const val MASK_BG_ENABLE = 0x08
 const val MASK_SPRITE_ENABLE = 0x10
 const val CTRL_SPRITE_PATTERN_TABLE = 0x08
+const val STATUS_SPRITE0_HIT = 0b01000000
 
 class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     private val tiles = TileParser.parseTiles(chrRom)
@@ -69,6 +70,7 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
                     }
                     261 -> { // pre-render line at dot 1
                         clearStatusFlag(STATUS_VBLANK)
+                        clearStatusFlag(STATUS_SPRITE0_HIT)
                         writeToggle = false
                         nmiOccurred = false
                     }
@@ -88,6 +90,30 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
 
     private fun renderPixel(x: Int, y: Int) {
         framebuffer[y * FRAME_WIDTH + x] = calculatePixel(x, y)
+
+        if ((status and STATUS_SPRITE0_HIT) == 0
+            && (mask and MASK_SPRITE_ENABLE) != 0
+            && x < 255
+        ) {
+            checkSprite0Hit(x, y)
+        }
+    }
+
+    private fun checkSprite0Hit(x: Int, y: Int) {
+        val sprite = getSprite(0)
+        val row = y - (sprite.y + 1)
+        val col = x - sprite.x
+        if (row !in 0 until 8 || col !in 0 until 8) return
+
+        val spriteColor = spriteColorIndex(sprite, row, col)
+        if (spriteColor == 0) return
+
+        val tileX = x / TILE_WIDTH
+        val tileY = y / TILE_HEIGHT
+        val bgTile = getTile(tileX, tileY)
+        if (bgTile[y % TILE_HEIGHT][x % TILE_WIDTH] != 0) {
+            setStatusFlag(STATUS_SPRITE0_HIT)
+        }
     }
 
     internal fun calculatePixel(x: Int, y: Int): Int {
@@ -304,7 +330,7 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
         val universalBgColorIndex = paletteRam[0].toUByte().toInt()
 
         // Use correct offset into paletteRam
-        val colorBase = 1 + paletteIndex * 3
+        val colorBase = paletteIndex * 4 + 1
 
         val color1Index = paletteRam[colorBase].toUByte().toInt() and 0x3F
         val color2Index = paletteRam[colorBase + 1].toUByte().toInt() and 0x3F

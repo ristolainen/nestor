@@ -538,6 +538,167 @@ class PPUTest : FreeSpec({
         }
     }
 
+    "sprite 0 hit" - {
+        "is set when opaque sprite 0 pixel overlaps opaque BG pixel" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData()) // BG tile: row 1 has opaque pixels at cols 1,3,5,7
+                .tile(0, 1, makeFrameSpriteTileData())  // sprite tile: all border pixels opaque
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            // BG: tile 0 at position (0,0)
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F // universal bg
+            ppu.paletteRam[1] = 0x01 // bg palette 0 color 1
+
+            // Sprite palette 0
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0 at (0, 0): OAM Y=0 means visible on scanlines 1–8
+            ppu.oamRam[0] = 0x00.toByte() // Y
+            ppu.oamRam[1] = 0x01.toByte() // tile id
+            ppu.oamRam[2] = 0x00.toByte() // attributes: palette 0, in front, no flip
+            ppu.oamRam[3] = 0x00.toByte() // X
+
+            // Before rendering, flag should be clear
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+
+            // Tick through scanlines 0–1 (2 × 341 dots).
+            // On scanline 1 (sprite row 0), pixel x=1 has:
+            //   BG checkerboard row 1 col 1 → color index 1 (opaque)
+            //   Frame sprite row 0 col 1 → color index 1 (opaque)
+            // → sprite 0 hit fires
+            ppu.tick(2 * 341)
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe STATUS_SPRITE0_HIT
+        }
+
+        "is not set when sprite 0 pixel is transparent" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData()) // BG tile
+                .tile(0, 1, makeCornerDotTileData())    // sprite tile: only (0,0) opaque
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[1] = 0x01
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0 at X=1: the single opaque pixel lands at screen (1,1).
+            // BG checkerboard row 1 col 1 → color index 1 (opaque).
+            // But flip the sprite horizontally so the dot moves to col 7 → screen (8,1).
+            // BG checkerboard row 1 col 8 → that's tile (1,0) nametable index 1 which is 0 → blank tile.
+            // Instead, just place sprite at X=1 with no flip, so opaque pixel is at (1,1).
+            // That WILL hit. So to test no-hit, place sprite where its only opaque pixel
+            // aligns with a transparent BG pixel.
+            // Checkerboard row 1: cols 0,2,4,6 are transparent (index 0).
+            // Corner dot at X=0: opaque pixel at (0,1). BG row 1 col 0 → index 0 (transparent).
+            // → no overlap, flag stays clear.
+            ppu.oamRam[0] = 0x00.toByte() // Y=0 → visible scanlines 1–8
+            ppu.oamRam[1] = 0x01.toByte() // tile id
+            ppu.oamRam[2] = 0x00.toByte()
+            ppu.oamRam[3] = 0x00.toByte() // X=0
+
+            ppu.tick(9 * 341) // tick through all scanlines the sprite covers
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+        }
+
+        "is not set when BG pixel is transparent" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeBlankTileData())       // BG tile: all transparent
+                .tile(0, 1, makeFrameSpriteTileData())  // sprite tile: border opaque
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[0x11] = 0x16
+
+            ppu.oamRam[0] = 0x00.toByte()
+            ppu.oamRam[1] = 0x01.toByte()
+            ppu.oamRam[2] = 0x00.toByte()
+            ppu.oamRam[3] = 0x00.toByte()
+
+            ppu.tick(9 * 341)
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+        }
+
+        "is not set when sprite rendering is disabled" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData())
+                .tile(0, 1, makeFrameSpriteTileData())
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE // sprites disabled
+
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[1] = 0x01
+            ppu.paletteRam[0x11] = 0x16
+
+            ppu.oamRam[0] = 0x00.toByte()
+            ppu.oamRam[1] = 0x01.toByte()
+            ppu.oamRam[2] = 0x00.toByte()
+            ppu.oamRam[3] = 0x00.toByte()
+
+            ppu.tick(9 * 341)
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+        }
+
+        "is cleared on the pre-render scanline" {
+            val ppu = PPU(ByteArray(0), MirroringMode.VERTICAL)
+            ppu.status = ppu.status or STATUS_SPRITE0_HIT
+
+            ppu.scanline = 260
+            ppu.cycle = 340
+
+            // Tick to dot 0 of scanline 261 — not cleared yet
+            ppu.tick(1)
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe STATUS_SPRITE0_HIT
+
+            // Tick to dot 1 of scanline 261 — cleared
+            ppu.tick(1)
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+        }
+
+        "only sprite 0 triggers the flag" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeCheckerboardTileData())
+                .tile(0, 1, makeFrameSpriteTileData())
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+
+            ppu.nametableRam[0] = 0x00
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[1] = 0x01
+            ppu.paletteRam[0x11] = 0x16
+
+            // Sprite 0: offscreen (Y=0xEF puts it below visible area)
+            ppu.oamRam[0] = 0xEF.toByte()
+            ppu.oamRam[1] = 0x01.toByte()
+            ppu.oamRam[2] = 0x00.toByte()
+            ppu.oamRam[3] = 0x00.toByte()
+
+            // Sprite 1: overlaps opaque BG at (0,0)
+            ppu.oamRam[4] = 0x00.toByte()
+            ppu.oamRam[5] = 0x01.toByte()
+            ppu.oamRam[6] = 0x00.toByte()
+            ppu.oamRam[7] = 0x00.toByte()
+
+            ppu.tick(9 * 341)
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
+        }
+    }
+
     "tick-based rendering" - {
         fun writePpuAddr(bus: MemoryBus, addr: Int) {
             bus.write(0x2006, (addr shr 8) and 0xFF)
@@ -559,7 +720,7 @@ class PPUTest : FreeSpec({
             bus.write(0x2007, 0b00000001)       // palette 1 for top-left quadrant
             writePpuAddr(bus, 0x3F00)
             bus.write(0x2007, 0x0F)             // universal bg color
-            writePpuAddr(bus, 0x3F04)
+            writePpuAddr(bus, 0x3F05)
             bus.write(0x2007, 0x01)             // palette 1 color 1
             bus.write(0x2007, 0x21)             // palette 1 color 2
             bus.write(0x2007, 0x31)             // palette 1 color 3
