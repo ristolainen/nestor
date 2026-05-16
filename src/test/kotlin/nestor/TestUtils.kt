@@ -95,6 +95,50 @@ fun makeFrameSpriteTileData(): ByteArray {
  */
 fun makeBlankTileData(): ByteArray = ByteArray(16)
 
+/** Tile where every pixel has color index 1 (plane 0 bits set, plane 1 clear). */
+fun makeSolid1TileData(): ByteArray = ByteArray(16).apply {
+    for (i in 0 until 8) this[i] = 0xFF.toByte()
+}
+
+/** Tile where every pixel has color index 2 (plane 1 bits set, plane 0 clear). */
+fun makeSolid2TileData(): ByteArray = ByteArray(16).apply {
+    for (i in 8 until 16) this[i] = 0xFF.toByte()
+}
+
+/** Tile where every pixel has color index 3 (both planes set). */
+fun makeSolid3TileData(): ByteArray = ByteArray(16).apply {
+    for (i in 0 until 16) this[i] = 0xFF.toByte()
+}
+
+/**
+ * Tile whose color depends on the row, so that fine-Y selection is observable.
+ * Row 0..7 → color 1, 2, 3, 1, 2, 3, 1, 2 (every column of a given row holds the same color).
+ */
+fun makeRowMarkerTileData(): ByteArray {
+    val tile = ByteArray(16)
+    val rowColors = intArrayOf(1, 2, 3, 1, 2, 3, 1, 2)
+    for (y in 0 until 8) {
+        val color = rowColors[y]
+        tile[y]     = (if ((color and 0b01) != 0) 0xFF else 0).toByte()  // plane 0
+        tile[8 + y] = (if ((color and 0b10) != 0) 0xFF else 0).toByte()  // plane 1
+    }
+    return tile
+}
+
+/** Pack scroll fields into a v/t register value per the NESdev bit layout. */
+fun tAddr(
+    coarseX: Int = 0,
+    coarseY: Int = 0,
+    ntX: Int = 0,
+    ntY: Int = 0,
+    fineY: Int = 0,
+): Int = coarseX or (coarseY shl 5) or (ntX shl 10) or (ntY shl 11) or (fineY shl 12)
+
+/** Byte offset into `nametableRam` for a given (ntX, coarseX, coarseY). Assumes the
+ *  caller uses an NT bank actually backed by RAM (NT0 or NT1 under vertical mirroring). */
+fun ntRamIdx(ntX: Int, coarseX: Int, coarseY: Int): Int =
+    ntX * 0x400 + coarseY * 32 + coarseX
+
 /**
  * Creates a "corner dot" sprite tile (8x8): only the top-left pixel
  * (row 0, col 0) is opaque (color index 1), everything else is transparent.

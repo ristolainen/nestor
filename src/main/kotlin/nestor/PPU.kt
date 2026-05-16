@@ -33,8 +33,6 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
 
     internal var control: Int = 0
     internal var mask: Int = 0
-    internal var scrollX: Int = 0
-    internal var scrollY: Int = 0
     internal var tempAddr: Int = 0
     internal var fineXScroll: Int = 0
     internal var oamAddr: Int = 0
@@ -105,35 +103,61 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
         val col = x - sprite.x
         if (row !in 0 until 8 || col !in 0 until 8) return
 
-        val spriteColor = spriteColorIndex(sprite, row, col)
-        if (spriteColor == 0) return
+        if (spriteColorIndex(sprite, row, col) == 0) return
 
-        val tileX = x / TILE_WIDTH
-        val tileY = y / TILE_HEIGHT
-        val bgTile = getTile(tileX, tileY)
-        if (bgTile[y % TILE_HEIGHT][x % TILE_WIDTH] != 0) {
+        if (fetchBackground(x, y).colorIndex != 0) {
             setStatusFlag(STATUS_SPRITE0_HIT)
         }
     }
 
     internal fun calculatePixel(x: Int, y: Int): Int {
-        val tileX = x / TILE_WIDTH
-        val tileY = y / TILE_HEIGHT
-        val bgTile = getTile(tileX, tileY)
-        val bgPalette = getPaletteForTile(tileX, tileY)
-        val bgColorIndex = bgTile[y % TILE_HEIGHT][x % TILE_WIDTH]
+        val bg = fetchBackground(x, y)
 
         val sprite = if ((mask and MASK_SPRITE_ENABLE) != 0) spriteAt(x, y) else null
 
         return when {
-            sprite == null -> bgPalette[bgColorIndex]
-            sprite.behindBackground && bgColorIndex != 0 -> bgPalette[bgColorIndex]
+            sprite == null -> bg.palette[bg.colorIndex]
+            sprite.behindBackground && bg.colorIndex != 0 -> bg.palette[bg.colorIndex]
             else -> {
                 val row = y - (sprite.y + 1)
                 val col = x - sprite.x
                 getSpritePalette(sprite.palette)[spriteColorIndex(sprite, row, col)]
             }
         }
+    }
+
+    private data class BackgroundPixel(val colorIndex: Int, val palette: IntArray)
+
+    private fun fetchBackground(x: Int, y: Int): BackgroundPixel {
+        // Scroll source: bits of t and the fine X latch (see NESdev PPU_scrolling).
+        val scrollCoarseX = tempAddr and 0x1F
+        val scrollCoarseY = (tempAddr shr 5) and 0x1F
+        val scrollNtX     = (tempAddr shr 10) and 0x01
+        val scrollNtY     = (tempAddr shr 11) and 0x01
+        val scrollFineY   = (tempAddr shr 12) and 0x07
+
+        // Translate the on-screen pixel into a position in the 512x480 virtual nametable grid.
+        val worldX = scrollCoarseX * 8 + fineXScroll + x
+        val worldY = scrollCoarseY * 8 + scrollFineY + y
+
+        val ntX     = scrollNtX xor (worldX / 256)
+        val ntY     = scrollNtY xor (worldY / 240)
+        val coarseX = (worldX / 8) and 0x1F
+        val coarseY = ((worldY / 8) % 30) and 0x1F
+        val fineX   = worldX and 0x07
+        val fineY   = worldY and 0x07
+
+        val ntAddr      = 0x2000 or (ntY shl 11) or (ntX shl 10) or (coarseY shl 5) or coarseX
+        val tileId      = nametableRam[mirrorNametableAddr(ntAddr)].toUByte().toInt()
+        val patternBase = if ((control and CTRL_BG_PATTERN_TABLE) != 0) 256 else 0
+        val colorIndex  = tiles[patternBase + tileId][fineY][fineX]
+
+        val attrAddr   = 0x23C0 or (ntY shl 11) or (ntX shl 10) or ((coarseY shr 2) shl 3) or (coarseX shr 2)
+        val attrByte   = nametableRam[mirrorNametableAddr(attrAddr)].toUByte().toInt()
+        val attrShift  = ((coarseY and 0b10) shl 1) or (coarseX and 0b10)
+        val paletteIdx = (attrByte shr attrShift) and 0b11
+
+        return BackgroundPixel(colorIndex, getPalette(paletteIdx))
     }
 
     fun cpuRead(addr: Int): Int = when (addr and 0x2007) {
@@ -221,12 +245,10 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
             // First write: horizontal scroll
             fineXScroll = value and 0x07
             tempAddr = (tempAddr and 0xFFE0) or (value shr 3)
-            scrollX = value
         } else {
             // Second write: vertical scroll
             tempAddr = (tempAddr and 0x8FFF) or ((value and 0x07) shl 12)     // fine Y
             tempAddr = (tempAddr and 0xFC1F) or ((value and 0xF8) shl 2)      // coarse Y
-            scrollY = value
         }
         writeToggle = !writeToggle
     }
@@ -294,35 +316,6 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
     }
 
     fun currentFrame() = framebuffer
-
-    private fun getTile(tileX: Int, tileY: Int): Array<IntArray> {
-        require(tileX in 0 until TILES_PER_ROW && tileY in 0 until TILES_PER_COL) {
-            "getTile(): tile coordinates out of bounds — tileX=$tileX (max ${TILES_PER_ROW - 1}), tileY=$tileY (max ${TILES_PER_COL - 1})"
-        }
-        val nametableIndex = tileY * TILES_PER_ROW + tileX
-        val tileId = nametableRam[nametableIndex].toUByte().toInt()
-        val bgPatternOffset = if ((control and CTRL_BG_PATTERN_TABLE) != 0) 256 else 0
-        return tiles[bgPatternOffset + tileId]
-    }
-
-    private fun getPaletteForTile(tileX: Int, tileY: Int): IntArray {
-        require(tileX in 0 until TILES_PER_ROW && tileY in 0 until TILES_PER_COL) {
-            "Tile coordinates out of bounds: ($tileX, $tileY)"
-        }
-
-        val attrIndex = (tileY / 4) * (TILES_PER_ROW / 4) + (tileX / 4)
-        val attrByte = nametableRam[ATTRTABLE_OFFSET + attrIndex].toUByte().toInt()
-
-        val shift = when {
-            tileX % 4 < 2 && tileY % 4 < 2 -> 0
-            tileX % 4 >= 2 && tileY % 4 < 2 -> 2
-            tileX % 4 < 2 && tileY % 4 >= 2 -> 4
-            else -> 6
-        }
-
-        val paletteIndex = (attrByte shr shift) and 0b11
-        return getPalette(paletteIndex)
-    }
 
     private fun getPalette(paletteIndex: Int): IntArray {
         require(paletteIndex in 0..3) { "Invalid background palette index: $paletteIndex" }

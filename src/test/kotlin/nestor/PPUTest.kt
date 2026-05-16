@@ -1,6 +1,9 @@
 package nestor
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FreeSpec
+import io.kotest.data.forAll
+import io.kotest.data.row
 import io.kotest.matchers.shouldBe
 
 class PPUTest : FreeSpec({
@@ -110,7 +113,7 @@ class PPUTest : FreeSpec({
             bus.write(0x2006, addr and 0xFF)
         }
 
-        fun setupNametableAndPalette(bus: MemoryBus) {
+        fun setupNametableAndPalette(bus: MemoryBus, ppu: PPU) {
             writePpuAddr(bus, 0x2000)
             bus.write(0x2007, 0x00) // tile index 0 at position (0,0)
             writePpuAddr(bus, 0x3F00)
@@ -118,6 +121,10 @@ class PPUTest : FreeSpec({
             bus.write(0x2007, 0x01) // palette 0 color 1
             bus.write(0x2007, 0x21) // palette 0 color 2
             bus.write(0x2007, 0x31) // palette 0 color 3
+            // $2006 palette setup left junk in tempAddr; real games reset scroll via $2005
+            // during VBlank before rendering. Mirror that here.
+            ppu.tempAddr = 0
+            ppu.fineXScroll = 0
         }
 
         "PPUCTRL bit 4 = 0 uses bank 0 (tiles 0–255)" {
@@ -125,7 +132,7 @@ class PPUTest : FreeSpec({
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x00 // bit 4 clear → bank 0
             ppu.mask = MASK_BG_ENABLE
-            setupNametableAndPalette(bus)
+            setupNametableAndPalette(bus, ppu)
 
             ppu.tick(240 * 341)
             val frame = ppu.currentFrame()
@@ -139,7 +146,7 @@ class PPUTest : FreeSpec({
             val bus = MemoryBus(ppu, ByteArray(0x4000))
             ppu.control = 0x10 // bit 4 set → bank 1
             ppu.mask = MASK_BG_ENABLE
-            setupNametableAndPalette(bus)
+            setupNametableAndPalette(bus, ppu)
 
             ppu.tick(240 * 341)
             val frame = ppu.currentFrame()
@@ -288,7 +295,6 @@ class PPUTest : FreeSpec({
             ppu.fineXScroll shouldBe 0b00000101
             ppu.tempAddr and 0x001F shouldBe 0b10100
             ppu.writeToggle shouldBe true
-            ppu.scrollX shouldBe 0b10100101
         }
 
         "cpuWrite $2005 should write coarseY and fineY on second write" {
@@ -299,7 +305,6 @@ class PPUTest : FreeSpec({
             (ppu.tempAddr shr 12) and 0b111 shouldBe 0b110  // fine Y
             (ppu.tempAddr shr 5) and 0b11111 shouldBe 0b01110  // coarse Y
             ppu.writeToggle shouldBe false
-            ppu.scrollY shouldBe 0b01110110
         }
 
         "cpuWrite $2006 should write high byte of tempAddr on first write" {
@@ -697,6 +702,124 @@ class PPUTest : FreeSpec({
 
             (ppu.status and STATUS_SPRITE0_HIT) shouldBe 0
         }
+
+        "compares against the scrolled background, not the screen-space tile" {
+            val chrRom = ChrRomBuilder()
+                .tile(0, 0, makeBlankTileData())        // tile 0: blank
+                .tile(0, 1, makeFrameSpriteTileData())  // sprite 0's tile: border opaque
+                .tile(0, 2, makeCheckerboardTileData()) // bg tile: row 1 col 1 opaque
+                .build()
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE or MASK_SPRITE_ENABLE
+            ppu.paletteRam[0] = 0x0F
+            ppu.paletteRam[1] = 0x01
+            ppu.paletteRam[0x11] = 0x16
+
+            // With scroll coarseX = 5, on-screen pixel (1, 1) reads world tile NT0(5, 0).
+            // Place the opaque BG tile *there*, and leave NT0(0, 0) blank so the
+            // screen-space lookup (the buggy path) sees nothing to hit.
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 5, coarseY = 0)] = 2
+            ppu.tempAddr = tAddr(coarseX = 5)
+
+            // Sprite 0 at (0, 0): frame sprite has opaque pixels along row 0, so
+            // screen pixel (1, 1) is opaque for sprite-0 too.
+            ppu.oamRam[0] = 0x00.toByte() // Y → visible on scanlines 1–8
+            ppu.oamRam[1] = 0x01.toByte() // tile id
+            ppu.oamRam[2] = 0x00.toByte()
+            ppu.oamRam[3] = 0x00.toByte() // X
+
+            ppu.tick(2 * 341)             // render scanlines 0–1
+
+            (ppu.status and STATUS_SPRITE0_HIT) shouldBe STATUS_SPRITE0_HIT
+        }
+    }
+
+    "calculatePixel - background under scroll" - {
+        // CHR-ROM with one tile per non-zero color index so we can identify which
+        // nametable cell was fetched just by inspecting the pixel that comes out.
+        // Tile 0 is left blank (default 16 zero bytes) so unset nametable cells
+        // resolve to the universal background color.
+        val chrRom = ChrRomBuilder()
+            .tile(0, 1, makeSolid1TileData())
+            .tile(0, 2, makeSolid2TileData())
+            .tile(0, 3, makeSolid3TileData())
+            .build()
+
+        fun makePpu(): PPU {
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE                                      // sprites off
+            ppu.paletteRam[0] = 0x0F                                       // universal bg
+            ppu.paletteRam[1] = 0x01                                       // palette 0 color 1
+            ppu.paletteRam[2] = 0x02                                       // palette 0 color 2
+            ppu.paletteRam[3] = 0x03                                       // palette 0 color 3
+            // Place distinguishable tiles at four NT cells; everything else stays tile 0 (blank).
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 0, coarseY = 0)] = 1
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 5, coarseY = 0)] = 2
+            ppu.nametableRam[ntRamIdx(ntX = 1, coarseX = 0, coarseY = 0)] = 3
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 0, coarseY = 4)] = 2
+            return ppu
+        }
+
+        forAll(
+            //    description                                  tempAddr                fineX  screenX  screenY  expected color
+            row(  "no scroll: NT0(0,0) = tile 1",              tAddr(),                  0,       0,       0,  nesPalette[0x01]),
+            row(  "coarseX=5: NT0(5,0) = tile 2",              tAddr(coarseX = 5),       0,       0,       0,  nesPalette[0x02]),
+            row(  "coarseX=6 lands on blank cell",             tAddr(coarseX = 6),       0,       0,       0,  nesPalette[0x0F]),
+            row(  "ntX=1: NT1(0,0) = tile 3",                  tAddr(ntX = 1),           0,       0,       0,  nesPalette[0x03]),
+            row(  "seam: coarseX=31 + screen x=8 → NT1(0,0)",  tAddr(coarseX = 31),      0,       8,       0,  nesPalette[0x03]),
+            row(  "coarseY=4: NT0(0,4) = tile 2",              tAddr(coarseY = 4),       0,       0,       0,  nesPalette[0x02]),
+        ) { description, tempAddr, fineX, x, y, expected ->
+            val ppu = makePpu()
+            ppu.tempAddr = tempAddr
+            ppu.fineXScroll = fineX
+
+            withClue(description) {
+                ppu.calculatePixel(x, y) shouldBe expected
+            }
+        }
+    }
+
+    "calculatePixel - sub-tile scroll offset" - {
+        // Two non-solid tiles let us observe which *pixel* within a tile got fetched:
+        //   - stripe tile:     col 0,2,4,6 = color 3; col 1,3,5,7 = color 2  (fine X observable)
+        //   - row marker tile: row 0..7    = color  1,2,3,1,2,3,1,2          (fine Y observable)
+        val chrRom = ChrRomBuilder()
+            .tile(0, 4, makeStripeTileData())
+            .tile(0, 5, makeRowMarkerTileData())
+            .build()
+
+        fun makePpu(): PPU {
+            val ppu = PPU(chrRom, MirroringMode.VERTICAL)
+            ppu.mask = MASK_BG_ENABLE
+            ppu.paletteRam[0] = 0x0F                                       // universal bg
+            ppu.paletteRam[1] = 0x01
+            ppu.paletteRam[2] = 0x02
+            ppu.paletteRam[3] = 0x03
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 0, coarseY = 0)] = 4  // stripe
+            ppu.nametableRam[ntRamIdx(ntX = 0, coarseX = 0, coarseY = 1)] = 5  // row marker
+            return ppu
+        }
+
+        forAll(
+            //    description                                       tempAddr                       fineX  screenX  screenY  expected
+            // Fine X: pick a column within the stripe tile at NT0(0,0).
+            row(  "fineX=0 + screen x=0 → stripe col 0 (color 3)",  tAddr(),                         0,       0,       0,  nesPalette[0x03]),
+            row(  "fineX=3 + screen x=0 → stripe col 3 (color 2)",  tAddr(),                         3,       0,       0,  nesPalette[0x02]),
+            row(  "fineX=5 + screen x=4 → next tile col 1 (blank)", tAddr(),                         5,       4,       0,  nesPalette[0x0F]),
+
+            // Fine Y: pick a row within the row-marker tile at NT0(0,1).
+            row(  "coarseY=1 + fineY=0 + screen y=0 → row 0 (color 1)",  tAddr(coarseY = 1),               0,       0,       0,  nesPalette[0x01]),
+            row(  "coarseY=1 + fineY=1 + screen y=0 → row 1 (color 2)",  tAddr(coarseY = 1, fineY = 1),    0,       0,       0,  nesPalette[0x02]),
+            row(  "coarseY=1 + fineY=5 + screen y=2 → row 7 (color 2)",  tAddr(coarseY = 1, fineY = 5),    0,       0,       2,  nesPalette[0x02]),
+        ) { description, tempAddr, fineX, x, y, expected ->
+            val ppu = makePpu()
+            ppu.tempAddr = tempAddr
+            ppu.fineXScroll = fineX
+
+            withClue(description) {
+                ppu.calculatePixel(x, y) shouldBe expected
+            }
+        }
     }
 
     "tick-based rendering" - {
@@ -724,6 +847,7 @@ class PPUTest : FreeSpec({
             bus.write(0x2007, 0x01)             // palette 1 color 1
             bus.write(0x2007, 0x21)             // palette 1 color 2
             bus.write(0x2007, 0x31)             // palette 1 color 3
+            ppu.tempAddr = 0                    // reset scroll after $2006 setup (cf. setupNametableAndPalette)
 
             ppu.tick(VISIBLE_FRAME_CYCLES)
 
