@@ -33,6 +33,13 @@ open class MemoryBus(
         }
     }
 
+    fun peek(address: Int): Int = when (address) {
+        in 0x0000..0x1FFF -> cpuRam[address % 0x0800].toUByte().toInt()
+        in 0x2000..0x3FFF -> ppu.cpuPeek(0x2000 + (address % 8))
+        in 0x8000..0xFFFF -> prgRom[if (prgRom.size == 0x4000) address % 0x4000 else address - 0x8000].toUByte().toInt()
+        else -> 0
+    }
+
     fun write(address: Int, value: Int) {
         when (address) {
             in 0x0000..0x1FFF -> {

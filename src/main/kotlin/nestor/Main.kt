@@ -4,9 +4,9 @@ import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
 fun main() {
-    // val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
+    val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
     // val rom = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
-    val rom = loadRomFile("test-roms/other/nestest.nes")
+    // val rom = loadRomFile("test-roms/other/nestest.nes")
     val inesRom = RomReader.read(rom)
 
     val ppu = PPU(inesRom.chrData, inesRom.header.mirroring)
@@ -18,13 +18,10 @@ fun main() {
     displayScreen(screen)
 
     val cpu = CPU(memoryBus)
-    val tracer = FileTracer()
+    val tracer = NullTracer
     val emulation = Emulation(cpu, ppu, memoryBus, screen, tracer)
-    // nestest automated mode: enter at $C000, ~26554 CPU cycles (< 1 frame).
-    // Trace is written to traces/<timestamp>.txt for diffing against
-    // roms/test-roms/other/nestest.log.
     try {
-        emulation.runFrames(1, entryPoint = 0xC000)
+        emulation.run()
     } catch (e: UnknownOpcodeException) {
         println(e.message)
     }

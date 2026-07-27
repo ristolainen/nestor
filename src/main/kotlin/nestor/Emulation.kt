@@ -14,24 +14,16 @@ class Emulation(
     val screen: ScreenRenderer,
     private val tracer: Tracer = NullTracer,
 ) {
-    fun run() {
-        println("Nestor NES Emulator starting...")
-        cpu.reset()
-    }
-
-    fun runFrames(frames: Int, entryPoint: Int? = null) {
-        println("Running $frames frame(s)")
+    fun run(entryPoint: Int? = null, until: () -> Boolean = { false }) {
         cpu.reset()
         entryPoint?.let {
             cpu.pc = it
             cpu.cycles = 7
             ppu.cycle = 21
         }
-        var cycles = 0
-        val limit = 29780 * frames
         try {
-            while (cycles < limit) {
-                cycles += step()
+            while (!until()) {
+                step()
             }
         } finally {
             tracer.close()

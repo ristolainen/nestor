@@ -167,6 +167,15 @@ class PPU(private val chrRom: ByteArray, private val mirroring: MirroringMode) {
         else -> 0 // write-only registers return open bus (0)
     }
 
+    fun cpuPeek(addr: Int): Int = when (addr and 0x2007) {
+        0x2002 -> status and 0xE0
+        0x2004 -> oamRam[oamAddr].toUByte().toInt()
+        0x2007 ->
+            if (vramAddr in PALETTE_START..0x3FFF) paletteRam[mirrorPaletteAddr(vramAddr)].toUByte().toInt()
+            else ppuDataBuffer.toUByte().toInt()
+        else -> 0
+    }
+
     fun cpuWrite(addr: Int, value: Int) {
         when (addr and 0x2007) {
             0x2000 -> writeControl(value)

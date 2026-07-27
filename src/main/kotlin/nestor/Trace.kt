@@ -10,11 +10,11 @@ package nestor
  *   C000  4C F5 C5  JMP $C5F5                       A:00 X:00 Y:00 P:24 SP:FD PPU:  0, 21 CYC:7
  */
 fun CPU.traceLine(): String {
-    val opByte = memory.read(pc)
+    val opByte = memory.peek(pc)
     val opcode = Opcode.fromByte(opByte)
     val mode = opcode?.mode ?: AddrMode.IMP
-    val b1 = if (mode.operandBytes >= 1) memory.read((pc + 1) and 0xFFFF) else null
-    val b2 = if (mode.operandBytes >= 2) memory.read((pc + 2) and 0xFFFF) else null
+    val b1 = if (mode.operandBytes >= 1) memory.peek((pc + 1) and 0xFFFF) else null
+    val b2 = if (mode.operandBytes >= 2) memory.peek((pc + 2) and 0xFFFF) else null
 
     val bytesStr = buildString {
         append(opByte.hex8())
@@ -25,7 +25,7 @@ fun CPU.traceLine(): String {
     val mnemonic = opcode?.mnemonic ?: "???"
     // Resolved-operand annotations mirror nestest.log (Nintendulator format): the effective
     // address (@) and the value at it (=) are shown for memory-addressing modes.
-    fun value(addr: Int) = memory.read(addr and 0xFFFF).hex8()
+    fun value(addr: Int) = memory.peek(addr and 0xFFFF).hex8()
     val operandStr = when (mode) {
         AddrMode.IMP -> ""
         AddrMode.ACC -> "A"
@@ -49,15 +49,15 @@ fun CPU.traceLine(): String {
         }
         // JMP indirect, replicating the 6502 page-boundary wrap bug on the pointer high byte.
         AddrMode.IND -> word(b1!!, b2!!).let { ptr ->
-            val lo = memory.read(ptr)
-            val hi = memory.read((ptr and 0xFF00) or ((ptr + 1) and 0xFF))
+            val lo = memory.peek(ptr)
+            val hi = memory.peek((ptr and 0xFF00) or ((ptr + 1) and 0xFF))
             "(\$${ptr.hex16()}) = ${word(lo, hi).hex16()}"
         }
         AddrMode.INX -> ((b1!! + x) and 0xFF).let { zp ->
-            val ea = word(memory.read(zp), memory.read((zp + 1) and 0xFF))
+            val ea = word(memory.peek(zp), memory.peek((zp + 1) and 0xFF))
             "(\$${b1.hex8()},X) @ ${zp.hex8()} = ${ea.hex16()} = ${value(ea)}"
         }
-        AddrMode.INY -> word(memory.read(b1!!), memory.read((b1 + 1) and 0xFF)).let { base ->
+        AddrMode.INY -> word(memory.peek(b1!!), memory.peek((b1 + 1) and 0xFF)).let { base ->
             val ea = (base + y) and 0xFFFF
             "(\$${b1.hex8()}),Y = ${base.hex16()} @ ${ea.hex16()} = ${value(ea)}"
         }
