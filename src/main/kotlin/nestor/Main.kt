@@ -4,9 +4,9 @@ import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
 fun main() {
-    // val rom = loadRomFile("test-roms/instr_test-v3/all_instrs.nes")
-    val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
+    // val rom = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
     // val rom = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
+    val rom = loadRomFile("test-roms/other/nestest.nes")
     val inesRom = RomReader.read(rom)
 
     val ppu = PPU(inesRom.chrData, inesRom.header.mirroring)
@@ -18,9 +18,12 @@ fun main() {
     displayScreen(screen)
 
     val cpu = CPU(memoryBus)
-    val tracer = NullTracer
+    val tracer = FileTracer()
     val emulation = Emulation(cpu, ppu, memoryBus, screen, tracer)
-    emulation.runFrames(1000)
+    // nestest automated mode: enter at $C000, ~26554 CPU cycles (< 1 frame).
+    // Trace is written to traces/<timestamp>.txt for diffing against
+    // roms/test-roms/other/nestest.log.
+    emulation.runFrames(1, entryPoint = 0xC000)
 }
 
 private fun displayScreen(screen: ScreenRenderer) {

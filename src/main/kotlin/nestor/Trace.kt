@@ -23,19 +23,44 @@ fun CPU.traceLine(): String {
     }.padEnd(8)
 
     val mnemonic = opcode?.mnemonic ?: "???"
+    // Resolved-operand annotations mirror nestest.log (Nintendulator format): the effective
+    // address (@) and the value at it (=) are shown for memory-addressing modes.
+    fun value(addr: Int) = memory.read(addr and 0xFFFF).hex8()
     val operandStr = when (mode) {
-        AddrMode.IMP, AddrMode.ACC -> ""
+        AddrMode.IMP -> ""
+        AddrMode.ACC -> "A"
         AddrMode.IMM -> "#\$${b1!!.hex8()}"
-        AddrMode.ZP  -> "\$${b1!!.hex8()}"
-        AddrMode.ZPX -> "\$${b1!!.hex8()},X"
-        AddrMode.ZPY -> "\$${b1!!.hex8()},Y"
+        AddrMode.ZP  -> "\$${b1!!.hex8()} = ${value(b1)}"
+        AddrMode.ZPX -> ((b1!! + x) and 0xFF).let { "\$${b1.hex8()},X @ ${it.hex8()} = ${value(it)}" }
+        AddrMode.ZPY -> ((b1!! + y) and 0xFF).let { "\$${b1.hex8()},Y @ ${it.hex8()} = ${value(it)}" }
         AddrMode.REL -> "\$${((pc + 2 + b1!!.toByte().toInt()) and 0xFFFF).hex16()}"
-        AddrMode.ABS -> "\$${word(b1!!, b2!!).hex16()}"
-        AddrMode.ABX -> "\$${word(b1!!, b2!!).hex16()},X"
-        AddrMode.ABY -> "\$${word(b1!!, b2!!).hex16()},Y"
-        AddrMode.IND -> "(\$${word(b1!!, b2!!).hex16()})"
-        AddrMode.INX -> "(\$${b1!!.hex8()},X)"
-        AddrMode.INY -> "(\$${b1!!.hex8()}),Y"
+        // JMP/JSR target no value; every other absolute op reads the byte there.
+        AddrMode.ABS -> word(b1!!, b2!!).let { addr ->
+            if (mnemonic == "JMP" || mnemonic == "JSR") "\$${addr.hex16()}"
+            else "\$${addr.hex16()} = ${value(addr)}"
+        }
+        AddrMode.ABX -> word(b1!!, b2!!).let { base ->
+            val ea = (base + x) and 0xFFFF
+            "\$${base.hex16()},X @ ${ea.hex16()} = ${value(ea)}"
+        }
+        AddrMode.ABY -> word(b1!!, b2!!).let { base ->
+            val ea = (base + y) and 0xFFFF
+            "\$${base.hex16()},Y @ ${ea.hex16()} = ${value(ea)}"
+        }
+        // JMP indirect, replicating the 6502 page-boundary wrap bug on the pointer high byte.
+        AddrMode.IND -> word(b1!!, b2!!).let { ptr ->
+            val lo = memory.read(ptr)
+            val hi = memory.read((ptr and 0xFF00) or ((ptr + 1) and 0xFF))
+            "(\$${ptr.hex16()}) = ${word(lo, hi).hex16()}"
+        }
+        AddrMode.INX -> ((b1!! + x) and 0xFF).let { zp ->
+            val ea = word(memory.read(zp), memory.read((zp + 1) and 0xFF))
+            "(\$${b1.hex8()},X) @ ${zp.hex8()} = ${ea.hex16()} = ${value(ea)}"
+        }
+        AddrMode.INY -> word(memory.read(b1!!), memory.read((b1 + 1) and 0xFF)).let { base ->
+            val ea = (base + y) and 0xFFFF
+            "(\$${b1.hex8()}),Y = ${base.hex16()} @ ${ea.hex16()} = ${value(ea)}"
+        }
     }
     val disasm = if (operandStr.isEmpty()) mnemonic else "$mnemonic $operandStr"
 

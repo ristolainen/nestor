@@ -49,6 +49,7 @@ class CPU(
         val hi = memory.read(0xFFFD)
         pc = word(lo, hi)
 
+        sp = 0xFD
         status = 0x24
     }
 
