@@ -29,17 +29,16 @@ class Emulation(
         }
         var cycles = 0
         val limit = 29780 * frames
-        while (cycles < limit) {
-            cycles += step()
+        try {
+            while (cycles < limit) {
+                cycles += step()
+            }
+        } finally {
+            tracer.close()
         }
-        tracer.close()
     }
 
     internal fun step(): Int {
-        if (cpu.abort) {
-            tracer.close()
-            System.exit(0)
-        }
         tracer.trace(cpu.traceLine())
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)

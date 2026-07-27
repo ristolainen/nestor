@@ -23,7 +23,11 @@ fun main() {
     // nestest automated mode: enter at $C000, ~26554 CPU cycles (< 1 frame).
     // Trace is written to traces/<timestamp>.txt for diffing against
     // roms/test-roms/other/nestest.log.
-    emulation.runFrames(1, entryPoint = 0xC000)
+    try {
+        emulation.runFrames(1, entryPoint = 0xC000)
+    } catch (e: UnknownOpcodeException) {
+        println(e.message)
+    }
 }
 
 private fun displayScreen(screen: ScreenRenderer) {

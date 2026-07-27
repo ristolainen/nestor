@@ -7,6 +7,9 @@ const val FLAG_DECIMAL = 0b00001000
 const val FLAG_OVERFLOW = 0b01000000
 const val FLAG_NEGATIVE = 0b10000000
 
+class UnknownOpcodeException(opcode: Int, pc: Int) :
+    RuntimeException("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
+
 class CPU(
     val memory: MemoryBus,
 ) {
@@ -42,8 +45,6 @@ class CPU(
             field = value and 0xFFFF
         }
 
-    var abort = false
-
     fun reset() {
         val lo = memory.read(0xFFFC)
         val hi = memory.read(0xFFFD)
@@ -55,7 +56,7 @@ class CPU(
 
     fun step(): Int {
         val byte = readNextByte()
-        val opcode = Opcode.fromByte(byte) ?: return unknown(byte).also { cycles += it }
+        val opcode = Opcode.fromByte(byte) ?: throw UnknownOpcodeException(byte, pc)
         return decodeAndExecute(opcode)
     }
 
@@ -250,7 +251,7 @@ class CPU(
         Opcode.CLD -> cld()
         // Misc
         Opcode.NOP -> noop()
-        else -> unknown(opcode.byte)
+        else -> throw UnknownOpcodeException(opcode.byte, pc)
     }.also { cycles += it }
 
     // ── Addressing mode helpers ───────────────────────────────────────────────
@@ -914,11 +915,6 @@ class CPU(
 
     // Misc
     private fun noop() = 2
-
-    private fun unknown(opcode: Int) = 1.also {
-        println("Unknown opcode: ${opcode.hex()}, ${opcode.bin()} at PC=${pc.hex()}")
-        abort = true
-    }
 
     // ── Flag helpers ─────────────────────────────────────────────────────────
 

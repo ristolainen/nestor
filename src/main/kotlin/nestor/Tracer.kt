@@ -10,15 +10,8 @@ fun interface Tracer {
     fun close() {}
 }
 
-class FileTracer : Tracer {
-    private val writer: PrintWriter
-
-    init {
-        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-        val file = File("traces/$timestamp.txt")
-        file.parentFile.mkdirs()
-        writer = PrintWriter(file)
-    }
+class FileTracer(file: File = defaultTraceFile()) : Tracer {
+    private val writer = PrintWriter(file)
 
     override fun trace(line: String) {
         writer.println(line)
@@ -27,6 +20,11 @@ class FileTracer : Tracer {
     override fun close() {
         writer.close()
     }
+}
+
+private fun defaultTraceFile(): File {
+    val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+    return File("traces/$timestamp.txt").also { it.parentFile.mkdirs() }
 }
 
 object NullTracer : Tracer {
