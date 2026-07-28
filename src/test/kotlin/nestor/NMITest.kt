@@ -39,17 +39,19 @@ class NMITest : FreeSpec({
         prg[0x3FFA] = 0x00; prg[0x3FFB] = 0x90.toByte() // NMI vector -> $9000
         prg[0x3FFC] = 0x00; prg[0x3FFD] = 0x80.toByte() // RESET vector -> $8000
 
-        val ppu = PPU(ByteArray(0), MirroringMode.VERTICAL)
+        val rom = INESRom(
+            header = INESRom.Header(
+                mapperNumber = 0,
+                prgSize = 0x4000,
+                chrSize = 0,
+                mirroring = MirroringMode.VERTICAL,
+            ),
+            prg,
+            ByteArray(0),
+        )
 
-        // --- CPU + MemoryBus -------------------------------------------------------------------
-        val mem = MemoryBus(ppu, prg)
-        val cpu = CPU(mem)
-        cpu.reset()
-
-        // --- Emulation wrapper -----------------------------------------------------------------
-        // Emulation.step() executes exactly 1 CPU instruction, advances the PPU
-        // by cycles*3, and polls/dispatches NMI between instructions.
-        val emu = Emulation(cpu, ppu, mem, ScreenRenderer())
+        val nes = NES(rom, ScreenRenderer())
+        nes.cpu.reset()
 
         // --- Run until the NMI handler stores the sentinel to $0002 ---------------------------
         // Hitting VBlank: 241 scanlines * 341 PPU dots ≈ 82,281 PPU cycles.
@@ -59,15 +61,15 @@ class NMITest : FreeSpec({
         val SENTINEL_VALUE = 0x99
         var guard = 20_000 // ~enough single-instruction steps to reach first VBlank
 
-        while (mem.read(SENTINEL_ADDR) != SENTINEL_VALUE && guard-- > 0) {
-            emu.step() // ADJUST HERE if your stepping method is named differently
+        while (nes.memory.read(SENTINEL_ADDR) != SENTINEL_VALUE && guard-- > 0) {
+            nes.step() // ADJUST HERE if your stepping method is named differently
         }
 
         // The NMI handler should have run and stored the sentinel byte.
-        mem.read(SENTINEL_ADDR) shouldBe SENTINEL_VALUE
+        nes.memory.read(SENTINEL_ADDR) shouldBe SENTINEL_VALUE
 
         // (Optional) sanity: after NMI, PC should be executing in the $9000 page (our handler)
         // Depending on where your loop lands, PC could be $9000, $9002, or $9004.
-        cpu.pc ushr 8 shouldBe 0x90
+        nes.cpu.pc ushr 8 shouldBe 0x90
     }
 })

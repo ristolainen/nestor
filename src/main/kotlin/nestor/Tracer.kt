@@ -6,15 +6,15 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 fun interface Tracer {
-    fun trace(line: String)
+    fun trace(lineSupplier: () -> String)
     fun close() {}
 }
 
 class FileTracer(file: File = defaultTraceFile()) : Tracer {
     private val writer = PrintWriter(file)
 
-    override fun trace(line: String) {
-        writer.println(line)
+    override fun trace(lineSupplier: () -> String) {
+        writer.println(lineSupplier())
     }
 
     override fun close() {
@@ -28,5 +28,5 @@ private fun defaultTraceFile(): File {
 }
 
 object NullTracer : Tracer {
-    override fun trace(line: String) {}
+    override fun trace(lineSupplier: () -> String) {}
 }

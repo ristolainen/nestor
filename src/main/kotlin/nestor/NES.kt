@@ -7,13 +7,21 @@ package nestor
  *  - PPU runs at ~5.37 MHz → 89342 PPU cycles per frame
  *  - 262 scanlines × 341 PPU clocks = 89342
  */
-class Emulation(
-    val cpu: CPU,
-    val ppu: PPU,
-    val memoryBus: MemoryBus,
-    val screen: ScreenRenderer,
+class NES(
+    rom: INESRom,
+    private val screen: ScreenRenderer,
     private val tracer: Tracer = NullTracer,
 ) {
+    val cpu: CPU
+    val ppu: PPU
+    val memory: MemoryBus
+
+    init {
+        ppu = PPU(rom.chrData, rom.header.mirroring)
+        memory = MemoryBus(ppu, rom.prgData)
+        cpu = CPU(memory)
+    }
+
     fun run(entryPoint: Int? = null, until: () -> Boolean = { false }) {
         cpu.reset()
         entryPoint?.let {
@@ -31,7 +39,7 @@ class Emulation(
     }
 
     internal fun step(): Int {
-        tracer.trace(cpu.traceLine())
+        tracer.trace { cpu.traceLine() }
         val cpuCycles = cpu.step()
         ppu.tick(cpuCycles * 3)
         if (ppu.frameReady) {
