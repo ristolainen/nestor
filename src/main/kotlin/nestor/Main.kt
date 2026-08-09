@@ -4,6 +4,8 @@ import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
 fun main() {
+    System.setProperty("apple.awt.application.name", "Nestor")
+
     val romFile = loadRomFile("goodnes/Europe/Super Mario Bros. (E) (V1.1) [!].nes")
     // val romFile = loadRomFile("goodnes/Europe/Excitebike (E) [!].nes")
     // val romFile = loadRomFile("test-roms/other/nestest.nes")
@@ -14,6 +16,7 @@ fun main() {
 
     val tracer = NullTracer
     val nes = NES(rom, screen, tracer)
+    connectKeyboard(nes.controller1)
     try {
         nes.run()
     } catch (e: UnknownOpcodeException) {
