@@ -71,6 +71,7 @@ Saved reference docs live in `.claude/reference/` — read these when implementi
 - `ref_cpu_memory_map.md` — full address space, mirroring, interrupt vectors, Mapper 0 specifics
 - `ref_cycle_timing.md` — CPU/PPU cycles per scanline/frame, master clock, key timing landmarks
 - `ref_trace_format.md` — CPU/PPU trace line format, field meanings, and how to diagnose divergences
+- `ref_controllers.md` — $4016/$4017 strobe sequence, shift register behaviour, button order, open bus
 
 ## Development Approach
 

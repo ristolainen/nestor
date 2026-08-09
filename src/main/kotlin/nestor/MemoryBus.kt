@@ -3,6 +3,8 @@ package nestor
 open class MemoryBus(
     internal val ppu: PPU,
     private val prgRom: ByteArray,
+    private val controller1: Controller,
+    private val controller2: Controller,
     private val cpuRam: ByteArray = ByteArray(0x0800),
 ) {
     private val journals = mutableListOf<(addr: Int, value: Int) -> Unit>()
@@ -21,6 +23,16 @@ open class MemoryBus(
             ppu.cpuRead(mirroredAddr)
         }
 
+        0x4016 -> {
+            // Controller 1
+            0x40 or controller1.read()
+        }
+
+        0x4017 -> {
+            // Controller 2
+            0x40 or controller2.read()
+        }
+
         in 0x8000..0xFFFF -> {
             // PRG-ROM (assume 16KB mirrored or 32KB flat, depending on mapper)
             val mappedAddr = if (prgRom.size == 0x4000) address % 0x4000 else address - 0x8000
@@ -36,6 +48,8 @@ open class MemoryBus(
     fun peek(address: Int): Int = when (address) {
         in 0x0000..0x1FFF -> cpuRam[address % 0x0800].toUByte().toInt()
         in 0x2000..0x3FFF -> ppu.cpuPeek(0x2000 + (address % 8))
+        0x4016 -> 0x40 or controller1.peek()
+        0x4017 -> 0x40 or controller2.peek()
         in 0x8000..0xFFFF -> prgRom[if (prgRom.size == 0x4000) address % 0x4000 else address - 0x8000].toUByte().toInt()
         else -> 0
     }
@@ -55,6 +69,11 @@ open class MemoryBus(
             0x4014 -> {
                 val base = value shl 8
                 ppu.oamDma(ByteArray(256) { i -> read(base or i).toByte() })
+            }
+
+            0x4016 -> {
+                controller1.write(value)
+                controller2.write(value)
             }
 
             in 0x8000..0xFFFF -> {

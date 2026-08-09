@@ -14,11 +14,15 @@ class NES(
 ) {
     val cpu: CPU
     val ppu: PPU
+    val controller1: Controller
+    val controller2: Controller
     val memory: MemoryBus
 
     init {
         ppu = PPU(rom.chrData, rom.header.mirroring)
-        memory = MemoryBus(ppu, rom.prgData)
+        controller1 = Controller()
+        controller2 = Controller()
+        memory = MemoryBus(ppu, rom.prgData, controller1, controller2)
         cpu = CPU(memory)
     }
 

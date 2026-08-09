@@ -449,7 +449,8 @@ fun cpu(instruction: Instruction, address: Int = 0x8000, ppu: PPU = PPU(ByteArra
     instruction.bytes.forEachIndexed { i, b -> prgRom[offset + i] = b.toByte() }
     prgRom[0x3FFC] = (address and 0xFF).toByte()
     prgRom[0x3FFD] = ((address shr 8) and 0xFF).toByte()
-    val cpu = CPU(MemoryBus(ppu, prgRom))
+    val memory = MemoryBus(ppu, prgRom, Controller(), Controller())
+    val cpu = CPU(memory)
     cpu.reset()
     return CpuFixture(cpu, instruction, startAddress = address)
 }

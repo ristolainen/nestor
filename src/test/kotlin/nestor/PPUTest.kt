@@ -129,7 +129,12 @@ class PPUTest : FreeSpec({
 
         "PPUCTRL bit 4 = 0 uses bank 0 (tiles 0–255)" {
             val ppu = PPU(bankedChrRom, MirroringMode.VERTICAL)
-            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            val bus = MemoryBus(
+                ppu = ppu,
+                prgRom = ByteArray(0x4000),
+                controller1 = Controller(),
+                controller2 = Controller(),
+            )
             ppu.control = 0x00 // bit 4 clear → bank 0
             ppu.mask = MASK_BG_ENABLE
             setupNametableAndPalette(bus, ppu)
@@ -143,7 +148,12 @@ class PPUTest : FreeSpec({
 
         "PPUCTRL bit 4 = 1 uses bank 1 (tiles 256–511)" {
             val ppu = PPU(bankedChrRom, MirroringMode.VERTICAL)
-            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            val bus = MemoryBus(
+                ppu = ppu,
+                prgRom = ByteArray(0x4000),
+                controller1 = Controller(),
+                controller2 = Controller(),
+            )
             ppu.control = 0x10 // bit 4 set → bank 1
             ppu.mask = MASK_BG_ENABLE
             setupNametableAndPalette(bus, ppu)
@@ -834,7 +844,12 @@ class PPUTest : FreeSpec({
         "should produce correct pixels after ticking through 240 visible scanlines" {
             val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
             val ppu = PPU(chrRom, MirroringMode.VERTICAL)
-            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            val bus = MemoryBus(
+                ppu = ppu,
+                prgRom = ByteArray(0x4000),
+                controller1 = Controller(),
+                controller2 = Controller(),
+            )
             ppu.mask = MASK_BG_ENABLE
 
             writePpuAddr(bus, 0x2000)
@@ -872,7 +887,12 @@ class PPUTest : FreeSpec({
         "should render incrementally — only ticked scanlines appear in the framebuffer" {
             val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
             val ppu = PPU(chrRom, MirroringMode.VERTICAL)
-            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            val bus = MemoryBus(
+                ppu = ppu,
+                prgRom = ByteArray(0x4000),
+                controller1 = Controller(),
+                controller2 = Controller(),
+            )
             ppu.mask = MASK_BG_ENABLE
 
             // Fill all 32×30 nametable positions with tile 0
@@ -903,7 +923,12 @@ class PPUTest : FreeSpec({
         "should not render when PPUMASK background enable bit is clear" {
             val chrRom = ChrRomBuilder().tile(0, 0, makeCheckerboardTileData()).build()
             val ppu = PPU(chrRom, MirroringMode.VERTICAL)
-            val bus = MemoryBus(ppu, ByteArray(0x4000))
+            val bus = MemoryBus(
+                ppu = ppu,
+                prgRom = ByteArray(0x4000),
+                controller1 = Controller(),
+                controller2 = Controller(),
+            )
             // mask left at 0 — background rendering disabled
 
             writePpuAddr(bus, 0x2000)
