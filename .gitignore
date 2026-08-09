@@ -46,5 +46,7 @@ local.properties
 roms/
 traces/
 
-# Claude Code
-.claude/
+# Claude Code — keep reference docs and plans, ignore local settings
+.claude/*
+!.claude/reference/
+!.claude/plans/
